@@ -4,19 +4,25 @@
  * Como funciona:
  * - Se a variável de ambiente VITE_API_URL estiver definida (ex.: http://localhost:3001),
  *   as funções passam a consumir a API REST real usando fetch.
- * - Enquanto VITE_API_URL não existir, a aplicação roda em modo MOCK (dados simulados
- *   com delay, como se fosse uma chamada de rede).
+ * - Enquanto VITE_API_URL não existir, a aplicação roda em modo MOCK: os dados de
+ *   contratos, clientes e perfil são persistidos no localStorage (sobrevivem ao F5)
+ *   e as funções retornam Promises com latência simulada.
  *
  * Para conectar ao seu backend Node.js basta criar um arquivo .env na raiz com:
  *   VITE_API_URL=http://localhost:3001
- * e manter os mesmos endpoints REST (/contracts, /profile).
+ * e implementar os endpoints REST listados no README.
  */
-import type { Contract, FreelancerProfile } from '../types'
+import type { Client, Contract, FreelancerProfile, SavedClient } from '../types'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const MOCK_DELAY_MS = 600
 
 export const isMockMode = API_BASE_URL.trim() === ''
+
+// Chaves de persistência do modo mock
+const CONTRACTS_KEY = 'contratofree.mock.contracts'
+const CLIENTS_KEY = 'contratofree.mock.clients'
+const PROFILE_KEY = 'contratofree.mock.profile'
 
 /** Helper genérico para chamadas REST reais. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -36,10 +42,25 @@ function delay<T>(data: T, ms = MOCK_DELAY_MS): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(structuredClone(data)), ms))
 }
 
+function loadLocal<T>(key: string, seed: T): T {
+  try {
+    const stored = localStorage.getItem(key)
+    if (stored) return JSON.parse(stored) as T
+  } catch {
+    // dados corrompidos: recai para o seed
+  }
+  persistLocal(key, seed)
+  return structuredClone(seed)
+}
+
+function persistLocal<T>(key: string, value: T): void {
+  localStorage.setItem(key, JSON.stringify(value))
+}
+
 // ---------------------------------------------------------------------------
-// MOCK: estado simulado do servidor
+// MOCK: estado simulado do servidor (persistido no localStorage)
 // ---------------------------------------------------------------------------
-const mockProfile: FreelancerProfile = {
+const seedProfile: FreelancerProfile = {
   nome: 'Ana Freelancer',
   email: 'ana@freela.com',
   telefone: '(11) 99999-0000',
@@ -51,7 +72,7 @@ const mockProfile: FreelancerProfile = {
     'O prazo final será contado a partir da confirmação do pagamento da primeira parcela.',
 }
 
-let mockContracts: Contract[] = [
+const seedContracts: Contract[] = [
   {
     id: 'ctr-1001',
     titulo: 'Landing page institucional',
@@ -105,17 +126,55 @@ let mockContracts: Contract[] = [
   },
 ]
 
+/** Clientes iniciais derivados dos contratos de exemplo (agenda nunca vazia na 1ª visita). */
+const seedClients: SavedClient[] = seedContracts.map((contract, index) => ({
+  ...contract.cliente,
+  id: `cli-100${index + 1}`,
+  criadoEm: contract.criadoEm,
+}))
+
+let mockContracts: Contract[] = loadLocal(CONTRACTS_KEY, seedContracts)
+let mockClients: SavedClient[] = loadLocal(CLIENTS_KEY, seedClients)
+let mockProfile: FreelancerProfile = loadLocal(PROFILE_KEY, seedProfile)
+
+function commitContracts(): void {
+  persistLocal(CONTRACTS_KEY, mockContracts)
+}
+
+function commitClients(): void {
+  persistLocal(CLIENTS_KEY, mockClients)
+}
+
+/** Upsert sincrono usado pelas mutações de contrato (mantém a agenda de clientes atualizada). */
+function upsertClientSync(client: Client): SavedClient {
+  const email = client.email.trim().toLowerCase()
+  const existing = mockClients.find((c) => c.email.trim().toLowerCase() === email)
+
+  if (existing) {
+    Object.assign(existing, client)
+    commitClients()
+    return existing
+  }
+
+  const created: SavedClient = {
+    ...client,
+    id: `cli-${Date.now()}`,
+    criadoEm: new Date().toISOString(),
+  }
+  mockClients = [created, ...mockClients]
+  commitClients()
+  return created
+}
+
 // ---------------------------------------------------------------------------
-// Endpoints públicos (mesmos nomes no mock e na API real)
+// Contratos — GET/POST /contracts · PUT/DELETE /contracts/:id
 // ---------------------------------------------------------------------------
 
-/** GET /contracts */
 export async function getContracts(): Promise<Contract[]> {
   if (isMockMode) return delay(mockContracts)
   return request<Contract[]>('/contracts')
 }
 
-/** POST /contracts */
 export async function createContract(payload: Omit<Contract, 'id' | 'criadoEm'>): Promise<Contract> {
   if (isMockMode) {
     const created: Contract = {
@@ -124,6 +183,8 @@ export async function createContract(payload: Omit<Contract, 'id' | 'criadoEm'>)
       criadoEm: new Date().toISOString(),
     }
     mockContracts = [created, ...mockContracts]
+    commitContracts()
+    upsertClientSync(payload.cliente)
     return delay(created, 400)
   }
   return request<Contract>('/contracts', {
@@ -132,16 +193,123 @@ export async function createContract(payload: Omit<Contract, 'id' | 'criadoEm'>)
   })
 }
 
-/** GET /profile */
+export async function updateContract(
+  id: string,
+  payload: Omit<Contract, 'id' | 'criadoEm'>,
+): Promise<Contract> {
+  if (isMockMode) {
+    const index = mockContracts.findIndex((c) => c.id === id)
+    if (index === -1) throw new Error('Contrato não encontrado.')
+
+    const updated: Contract = { ...mockContracts[index], ...payload }
+    mockContracts[index] = updated
+    commitContracts()
+    upsertClientSync(payload.cliente)
+    return delay(updated, 400)
+  }
+  return request<Contract>(`/contracts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteContract(id: string): Promise<void> {
+  if (isMockMode) {
+    mockContracts = mockContracts.filter((c) => c.id !== id)
+    commitContracts()
+    await delay(null, 350)
+    return
+  }
+  await request<void>(`/contracts/${id}`, { method: 'DELETE' })
+}
+
+/**
+ * Assina um contrato: muda o status para "assinado" e grava quem assinou,
+ * a data/hora (detectada aqui, automaticamente) e o desenho opcional.
+ * POST /contracts/:id/sign
+ */
+export async function signContract(
+  id: string,
+  signature: { por: string; imagem?: string },
+): Promise<Contract> {
+  if (isMockMode) {
+    const index = mockContracts.findIndex((c) => c.id === id)
+    if (index === -1) throw new Error('Contrato não encontrado.')
+
+    const updated: Contract = {
+      ...mockContracts[index],
+      status: 'assinado',
+      assinatura: {
+        por: signature.por.trim(),
+        em: new Date().toISOString(),
+        imagem: signature.imagem,
+      },
+    }
+    mockContracts[index] = updated
+    commitContracts()
+    return delay(updated, 450)
+  }
+  return request<Contract>(`/contracts/${id}/sign`, {
+    method: 'POST',
+    body: JSON.stringify(signature),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Clientes — GET/POST /clients · PUT/DELETE /clients/:id
+// ---------------------------------------------------------------------------
+
+export async function getClients(): Promise<SavedClient[]> {
+  if (isMockMode) return delay(mockClients)
+  return request<SavedClient[]>('/clients')
+}
+
+/** Salva um cliente; se o e-mail já existir, atualiza o registro (upsert). */
+export async function saveClient(client: Client): Promise<SavedClient> {
+  if (isMockMode) return delay(upsertClientSync(client), 350)
+  return request<SavedClient>('/clients', {
+    method: 'POST',
+    body: JSON.stringify(client),
+  })
+}
+
+export async function updateClient(id: string, client: Client): Promise<SavedClient> {
+  if (isMockMode) {
+    const existing = mockClients.find((c) => c.id === id)
+    if (!existing) throw new Error('Cliente não encontrado.')
+    Object.assign(existing, client)
+    commitClients()
+    return delay(existing, 350)
+  }
+  return request<SavedClient>(`/clients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(client),
+  })
+}
+
+export async function deleteClient(id: string): Promise<void> {
+  if (isMockMode) {
+    mockClients = mockClients.filter((c) => c.id !== id)
+    commitClients()
+    await delay(null, 350)
+    return
+  }
+  await request<void>(`/clients/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// Perfil — GET/PUT /profile
+// ---------------------------------------------------------------------------
+
 export async function getProfile(): Promise<FreelancerProfile> {
   if (isMockMode) return delay(mockProfile)
   return request<FreelancerProfile>('/profile')
 }
 
-/** PUT /profile */
 export async function updateProfile(profile: FreelancerProfile): Promise<FreelancerProfile> {
   if (isMockMode) {
-    Object.assign(mockProfile, profile)
+    mockProfile = { ...profile }
+    persistLocal(PROFILE_KEY, mockProfile)
     return delay(mockProfile, 400)
   }
   return request<FreelancerProfile>('/profile', {

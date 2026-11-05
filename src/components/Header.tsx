@@ -30,6 +30,12 @@ export function Header() {
             Novo contrato
           </NavLink>
           <NavLink
+            to="/clientes"
+            className={({ isActive }) => (isActive ? 'is-active' : '')}
+          >
+            Clientes
+          </NavLink>
+          <NavLink
             to="/perfil"
             className={({ isActive }) => (isActive ? 'is-active' : '')}
           >

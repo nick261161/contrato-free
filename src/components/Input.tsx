@@ -1,4 +1,8 @@
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type {
+  InputHTMLAttributes,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react'
 
 interface BaseProps {
   label: string
@@ -41,6 +45,50 @@ export function Textarea({ label, error, hint, className = '', id, ...rest }: Te
         {label}
       </label>
       <textarea id={inputId} className="field__control field__control--textarea" {...rest} />
+      {error ? (
+        <span className="field__error">{error}</span>
+      ) : hint ? (
+        <span className="field__hint">{hint}</span>
+      ) : null}
+    </div>
+  )
+}
+
+export interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label: string
+  options: SelectOption[]
+  error?: string
+  hint?: string
+}
+
+export function Select({
+  label,
+  options,
+  error,
+  hint,
+  className = '',
+  id,
+  ...rest
+}: SelectProps) {
+  const inputId = id ?? rest.name
+
+  return (
+    <div className={`field ${error ? 'field--invalid' : ''} ${className}`}>
+      <label className="field__label" htmlFor={inputId}>
+        {label}
+      </label>
+      <select id={inputId} className="field__control" {...rest}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
       {error ? (
         <span className="field__error">{error}</span>
       ) : hint ? (

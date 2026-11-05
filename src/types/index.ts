@@ -8,6 +8,16 @@ export interface Client {
   endereco: string
 }
 
+/** Assinatura registrada sobre um contrato. */
+export interface Signature {
+  /** Quem assinou (nome). */
+  por: string
+  /** Data/hora ISO da assinatura (detectada automaticamente pelo app). */
+  em: string
+  /** Desenho da assinatura em dataURL (opcional). */
+  imagem?: string
+}
+
 export interface Contract {
   id: string
   titulo: string
@@ -18,6 +28,7 @@ export interface Contract {
   descricao: string
   status: ContractStatus
   criadoEm: string
+  assinatura?: Signature
 }
 
 export interface FreelancerProfile {
@@ -27,6 +38,12 @@ export interface FreelancerProfile {
   profissao: string
   pix: string
   termosPadrao: string
+}
+
+/** Cliente salvo na agenda do freelancer (persistido). */
+export interface SavedClient extends Client {
+  id: string
+  criadoEm: string
 }
 
 export interface AuthUser {

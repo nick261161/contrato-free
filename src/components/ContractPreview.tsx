@@ -99,6 +99,25 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
 
       <section className="preview__section">
         <h3>3. Assinaturas</h3>
+
+        {contract.assinatura && (
+          <div className="preview__signature-stamp">
+            {contract.assinatura.imagem ? (
+              <img
+                src={contract.assinatura.imagem}
+                alt={`Assinatura de ${contract.assinatura.por}`}
+              />
+            ) : (
+              <p className="preview__signature-typed">{contract.assinatura.por}</p>
+            )}
+            <span>
+              Assinado por <strong>{contract.assinatura.por}</strong> em{' '}
+              {new Date(contract.assinatura.em).toLocaleString('pt-BR')} — registro
+              automático da plataforma.
+            </span>
+          </div>
+        )}
+
         <div className="preview__signatures">
           <div>
             <div className="preview__line" />

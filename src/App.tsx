@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
+import { Clientes } from './pages/Clientes'
 import { Dashboard } from './pages/Dashboard'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
@@ -27,9 +28,17 @@ export default function App() {
           }
         />
 
-        {/* 4. Wizard de geração de contrato (protegida) */}
+        {/* 4. Wizard de geração de contrato (protegida) — também edita via /novo-contrato/:id */}
         <Route
           path="/novo-contrato"
+          element={
+            <ProtectedRoute>
+              <NovoContrato />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/novo-contrato/:id"
           element={
             <ProtectedRoute>
               <NovoContrato />
@@ -43,6 +52,16 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Perfil />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 6. Agenda de clientes salvos (protegida) */}
+        <Route
+          path="/clientes"
+          element={
+            <ProtectedRoute>
+              <Clientes />
             </ProtectedRoute>
           }
         />

@@ -25,6 +25,19 @@ export function ContractCard({ contract, onView }: ContractCardProps) {
       <h3 className="contract-card__title">{contract.titulo}</h3>
       <p className="contract-card__client">{contract.cliente.nome}</p>
 
+      {contract.assinatura && (
+        <p className="contract-card__signed">
+          ✍️ Assinado em{' '}
+          {new Date(contract.assinatura.em).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </p>
+      )}
+
       <div className="contract-card__meta">
         <div>
           <span>Valor</span>

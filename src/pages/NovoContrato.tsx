@@ -1,15 +1,22 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ContractPreview } from '../components/ContractPreview'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
-import { Input, Textarea } from '../components/Input'
+import { Input, Select, Textarea } from '../components/Input'
 import { Modal } from '../components/Modal'
 import { Sidebar } from '../components/Sidebar'
+import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { getProfile } from '../services/api'
+import { getContracts, getProfile } from '../services/api'
 import type { Contract, FreelancerProfile } from '../types'
 
 interface WizardState {
@@ -44,7 +51,10 @@ const steps = [
 
 export function NovoContrato() {
   const navigate = useNavigate()
-  const { addContract } = useContracts()
+  const { id: routeId } = useParams<{ id: string }>()
+
+  const { addContract, editContract } = useContracts()
+  const { clients, reload: reloadClients } = useClients()
   const [profile] = useLocalStorage<FreelancerProfile | null>('contratofree.profile', null)
 
   // useState: controla o wizard em 3 etapas e todos os campos do formulário
@@ -54,6 +64,10 @@ export function NovoContrato() {
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState<Contract | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<FreelancerProfile | null>(null)
+
+  // useState: contrato sendo editado (null = criando novo)
+  const [editing, setEditing] = useState<Contract | null>(null)
+  const [naoEncontrado, setNaoEncontrado] = useState(false)
 
   // useRef: aponta para a div do contrato gerado (usada na impressão/exportação em PDF)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -73,6 +87,45 @@ export function NovoContrato() {
     }
   }, [profile])
 
+  // useEffect: em modo edição, carrega o contrato da URL e preenche o formulário
+  useEffect(() => {
+    if (!routeId) {
+      setEditing(null)
+      return
+    }
+
+    let ativo = true
+    getContracts()
+      .then((lista) => {
+        if (!ativo) return
+        const found = lista.find((c) => c.id === routeId)
+        if (!found) {
+          setNaoEncontrado(true)
+          return
+        }
+        setEditing(found)
+        setForm({
+          titulo: found.titulo,
+          clienteNome: found.cliente.nome,
+          clienteEmail: found.cliente.email,
+          clienteCpf: found.cliente.cpfCnpj,
+          clienteEndereco: found.cliente.endereco,
+          descricao: found.descricao,
+          valor: String(found.valor),
+          dataInicio: found.dataInicio,
+          prazoDias: String(found.prazoDias),
+        })
+        setErrors({})
+      })
+      .catch(() => {
+        if (ativo) setNaoEncontrado(true)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [routeId])
+
   const freelancer: FreelancerProfile = perfilLocal ?? {
     nome: '',
     email: '',
@@ -83,7 +136,7 @@ export function NovoContrato() {
   }
 
   const previewContract: Contract = {
-    id: '',
+    id: editing?.id ?? '',
     titulo: form.titulo,
     cliente: {
       nome: form.clienteNome,
@@ -95,13 +148,32 @@ export function NovoContrato() {
     dataInicio: form.dataInicio,
     prazoDias: Number(form.prazoDias) || 0,
     descricao: form.descricao,
-    status: 'rascunho',
-    criadoEm: new Date().toISOString(),
+    status: editing?.status ?? 'rascunho',
+    criadoEm: editing?.criadoEm ?? new Date().toISOString(),
+    assinatura: editing?.assinatura,
   }
 
   function update(field: keyof WizardState, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: undefined }))
+  }
+
+  /** Preenche os campos do cliente ao escolher um contato já salvo. */
+  function handleSelectClient(event: ChangeEvent<HTMLSelectElement>) {
+    const value = event.target.value
+    if (!value) return
+
+    const found = clients.find((c) => c.id === value)
+    if (!found) return
+
+    setForm((current) => ({
+      ...current,
+      clienteNome: found.nome,
+      clienteEmail: found.email,
+      clienteCpf: found.cpfCnpj,
+      clienteEndereco: found.endereco,
+    }))
+    setErrors({})
   }
 
   function validate(currentStep: number): boolean {
@@ -148,29 +220,59 @@ export function NovoContrato() {
     event.preventDefault()
     if (!validate(2)) return
 
+    const payload = {
+      titulo: form.titulo.trim(),
+      cliente: {
+        nome: form.clienteNome.trim(),
+        email: form.clienteEmail.trim(),
+        cpfCnpj: form.clienteCpf.trim(),
+        endereco: form.clienteEndereco.trim(),
+      },
+      valor: Number(form.valor.replace(',', '.')),
+      dataInicio: form.dataInicio,
+      prazoDias: Number(form.prazoDias),
+      descricao: form.descricao.trim(),
+      status: editing ? editing.status : 'pendente',
+    }
+
     setSalvando(true)
     try {
-      const created = await addContract({
-        titulo: form.titulo.trim(),
-        cliente: {
-          nome: form.clienteNome.trim(),
-          email: form.clienteEmail.trim(),
-          cpfCnpj: form.clienteCpf.trim(),
-          endereco: form.clienteEndereco.trim(),
-        },
-        valor: Number(form.valor.replace(',', '.')),
-        dataInicio: form.dataInicio,
-        prazoDias: Number(form.prazoDias),
-        descricao: form.descricao.trim(),
-        status: 'pendente',
-      })
-      setSucesso(created)
+      const saved = editing
+        ? await editContract(editing.id, payload)
+        : await addContract(payload)
+      setSucesso(saved)
+      void reloadClients()
     } catch {
       setErrors({ titulo: 'Não foi possível salvar o contrato. Tente novamente.' })
     } finally {
       setSalvando(false)
     }
   }
+
+  if (naoEncontrado) {
+    return (
+      <div className="page">
+        <Header />
+        <div className="container app-layout">
+          <Sidebar />
+          <main className="app-main">
+            <div className="empty">
+              <p>Contrato não encontrado. Ele pode ter sido excluído.</p>
+              <Link to="/dashboard" className="btn btn--primary">
+                Voltar ao dashboard
+              </Link>
+            </div>
+          </main>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  const clientOptions = [
+    { value: '', label: '— Preencher manualmente —' },
+    ...clients.map((c) => ({ value: c.id, label: `${c.nome} (${c.email})` })),
+  ]
 
   return (
     <div className="page">
@@ -182,8 +284,10 @@ export function NovoContrato() {
         <main className="app-main">
           <div className="app-main__head">
             <div>
-              <span className="app-main__eyebrow">Assistente de contratos</span>
-              <h1>Novo contrato</h1>
+              <span className="app-main__eyebrow">
+                {editing ? `Editando #${editing.id}` : 'Assistente de contratos'}
+              </span>
+              <h1>{editing ? 'Editar contrato' : 'Novo contrato'}</h1>
             </div>
             <Link to="/dashboard" className="btn btn--ghost">
               Voltar ao painel
@@ -212,6 +316,7 @@ export function NovoContrato() {
               {step === 1 && (
                 <section className="panel">
                   <h2>Dados do cliente</h2>
+
                   <Input
                     label="Título do contrato"
                     name="titulo"
@@ -220,6 +325,20 @@ export function NovoContrato() {
                     onChange={(event) => update('titulo', event.target.value)}
                     error={errors.titulo}
                   />
+
+                  <Select
+                    label="Usar cliente já salvo"
+                    name="clienteSalvo"
+                    options={clientOptions}
+                    onChange={handleSelectClient}
+                    value=""
+                    hint={
+                      clients.length === 0
+                        ? 'Nenhum cliente salvo ainda — um cliente é salvo automaticamente ao gerar contratos.'
+                        : 'Escolha um contato para preencher os campos abaixo automaticamente.'
+                    }
+                  />
+
                   <Input
                     label="Nome do cliente / empresa"
                     name="clienteNome"
@@ -301,7 +420,7 @@ export function NovoContrato() {
 
               {step === 3 && (
                 <section className="panel">
-                  <h2>Revisão e geração</h2>
+                  <h2>{editing ? 'Revisão e salvamento' : 'Revisão e geração'}</h2>
                   <ul className="review">
                     <li>
                       <span>Contrato</span>
@@ -322,8 +441,18 @@ export function NovoContrato() {
                   </ul>
 
                   <p className="panel__note">
-                    Ao gerar, o contrato será salvo com status <strong>Pendente</strong> e
-                    ficará disponível no seu dashboard.
+                    {editing ? (
+                      <>
+                        As alterações serão salvas no contrato <strong>#{editing.id}</strong>,
+                        mantendo o status atual (<strong>{editing.status}</strong>).
+                      </>
+                    ) : (
+                      <>
+                        Ao gerar, o contrato será salvo com status{' '}
+                        <strong>Pendente</strong>, o cliente ficará na sua agenda e o
+                        contrato aparecerá no dashboard.
+                      </>
+                    )}
                   </p>
 
                   <div className="wizard__actions">
@@ -331,7 +460,11 @@ export function NovoContrato() {
                       🖨️ Imprimir / Salvar PDF
                     </Button>
                     <Button type="submit" disabled={salvando}>
-                      {salvando ? 'Gerando…' : 'Gerar contrato ✓'}
+                      {salvando
+                        ? 'Salvando…'
+                        : editing
+                          ? 'Salvar alterações ✓'
+                          : 'Gerar contrato ✓'}
                     </Button>
                   </div>
                 </section>
@@ -359,7 +492,7 @@ export function NovoContrato() {
 
       <Modal
         open={sucesso !== null}
-        title="Contrato gerado com sucesso! 🎉"
+        title={editing ? 'Contrato atualizado! ✅' : 'Contrato gerado com sucesso! 🎉'}
         onClose={() => setSucesso(null)}
         footer={
           <>
@@ -368,9 +501,12 @@ export function NovoContrato() {
             </Button>
             <Button
               onClick={() => {
+                const wasEditing = Boolean(editing)
                 setSucesso(null)
-                setForm(initialForm)
-                setStep(1)
+                if (!wasEditing) {
+                  setForm(initialForm)
+                  setStep(1)
+                }
                 navigate('/dashboard')
               }}
               type="button"
@@ -381,8 +517,10 @@ export function NovoContrato() {
         }
       >
         <p>
-          O contrato <strong>{sucesso?.titulo}</strong> foi salvo para{' '}
-          <strong>{sucesso?.cliente.nome}</strong> com status pendente.
+          O contrato <strong>{sucesso?.titulo}</strong> ({sucesso?.id}) foi{' '}
+          {editing ? 'atualizado' : 'salvo'} para{' '}
+          <strong>{sucesso?.cliente.nome}</strong>. Os dados do cliente ficaram salvos na
+          sua agenda.
         </p>
       </Modal>
 

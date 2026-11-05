@@ -7,9 +7,11 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  /** Elemento alinhado à esquerda do rodapé (ex.: botão de excluir). */
+  footerStart?: ReactNode
 }
 
-export function Modal({ open, title, onClose, children, footer }: ModalProps) {
+export function Modal({ open, title, onClose, children, footer, footerStart }: ModalProps) {
   // useEffect: fecha o modal com a tecla ESC
   useEffect(() => {
     if (!open) return
@@ -42,7 +44,10 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
         <div className="modal__body">{children}</div>
 
-        <div className="modal__footer">
+        <div
+          className={`modal__footer ${footerStart ? 'modal__footer--split' : ''}`}
+        >
+          {footerStart}
           {footer ?? (
             <Button variant="secondary" onClick={onClose}>
               Fechar
