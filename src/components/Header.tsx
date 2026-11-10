@@ -14,9 +14,12 @@ export function Header() {
         </Link>
 
         <nav className="header__nav">
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'is-active' : '')}>
-            Início
-          </NavLink>
+          {/* Visitante (antes do login): só o Início. Logado: só as áreas do painel. */}
+          {!user && (
+            <NavLink to="/" end className={({ isActive }) => (isActive ? 'is-active' : '')}>
+              Início
+            </NavLink>
+          )}
           {user && (
             <>
               <NavLink
