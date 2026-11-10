@@ -13,6 +13,14 @@ const currency = new Intl.NumberFormat('pt-BR', {
 export function ContractCard({ contract, onView }: ContractCardProps) {
   const criado = new Date(contract.criadoEm).toLocaleDateString('pt-BR')
 
+  const temPrestador = Boolean(contract.assinaturaPrestador)
+  const temCliente = Boolean(contract.assinaturaContratante)
+  const ambas = temPrestador && temCliente
+
+  // data da assinatura final (a última das duas partes a assinar)
+  const emFinal =
+    contract.assinaturaContratante?.em ?? contract.assinaturaPrestador?.em
+
   return (
     <article className="contract-card">
       <div className="contract-card__top">
@@ -25,16 +33,22 @@ export function ContractCard({ contract, onView }: ContractCardProps) {
       <h3 className="contract-card__title">{contract.titulo}</h3>
       <p className="contract-card__client">{contract.cliente.nome}</p>
 
-      {contract.assinatura && (
+      {ambas && emFinal && (
         <p className="contract-card__signed">
           ✍️ Assinado em{' '}
-          {new Date(contract.assinatura.em).toLocaleString('pt-BR', {
+          {new Date(emFinal).toLocaleString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
           })}
+        </p>
+      )}
+
+      {(temPrestador || temCliente) && !ambas && (
+        <p className="contract-card__signed contract-card__signed--pending">
+          ✍️ Falta assinatura do {temPrestador ? 'cliente' : 'prestador'}
         </p>
       )}
 

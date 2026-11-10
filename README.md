@@ -5,22 +5,36 @@
 
 O freelancer preenche um wizard curto (cliente → escopo e valores → revisão), a
 plataforma monta o contrato com os termos padrão salvos no perfil, exibe uma prévia em
-tempo real e permite salvar, acompanhar métricas no dashboard e exportar o documento
-em PDF/impressão.
+tempo real e permite salvar, **enviar o link de assinatura para o cliente**, acompanhar
+métricas no dashboard e **baixar o PDF assinado** (ou imprimir).
 
 **Funcionalidades completas de gestão:**
 
 - ✏️ **Editar contratos** (`/novo-contrato/:id`) — abra qualquer contrato pelo dashboard
   e refaça as etapas do wizard com os dados já preenchidos;
 - 🗑️ **Excluir contratos** — com modal de confirmação no painel;
-- ✍️ **Assinatura do contrato** — botão “Assinar contrato” abre um modal em que o
-  assinante **desenha a assinatura em um canvas** (ou apenas confirma o nome): o app
-  **detecta e grava automaticamente a data/hora da assinatura**, muda o status para
-  *Assinado* e exibe o carimbo no card, nos detalhes, na prévia e no PDF;
+- ✍️ **Assinatura em duas partes** — o contrato tem dois espaços de assinatura:
+  **prestador** (o freelancer, pelo dashboard, em “Assinar como → Prestador”) e
+  **contratante** (o cliente, pelo link público). Cada assinatura é **desenhada em um
+  canvas** (ou só se confirma o nome), fica **alinhada por cima da linha do nome**
+  na prévia e no PDF, e o app **grava automaticamente quem assinou e a data/hora**
+  (carimbo no card, nos detalhes, na prévia e no PDF). O contrato só fica *Assinado*
+  quando as **duas** assinaturas estão registradas;
+- 🔗 **Link de assinatura para o cliente** — cada contrato gera um endereço público
+  (`/assinar/:id`) que o cliente abre **sem criar conta**, lê o documento e assina no
+  próprio ContratoFree; os detalhes do contrato e o modal de sucesso trazem um bloco
+  para **copiar o link** ou **abrir um e-mail** com ele;
+- ⬇️ **Download do PDF assinado** — botão “Baixar PDF” gera o arquivo real (jsPDF)
+  com o contrato, as assinaturas desenhadas e os carimbos de data/hora — disponível
+  nos detalhes do contrato, no wizard e na página pública;
 - 👥 **Agenda de clientes** (`/clientes`) — cadastro, edição e exclusão de clientes,
   com contagem de contratos vinculados;
 - 💾 **Persistência** — contratos, clientes e perfil ficam salvos (localStorage no modo
   mock) e sobrevivem ao F5; os clientes são reutilizáveis no wizard por um seletor.
+
+> ⚠️ **Modo mock (padrão):** sem backend, os dados ficam no `localStorage` do navegador,
+> então o link de assinatura abre **no mesmo navegador/computador**. Configurando
+> `VITE_API_URL` para um backend real (abaixo), o cliente abre o link de qualquer lugar.
 
 ---
 
@@ -72,6 +86,7 @@ src/
 │   ├── ContractPreview.tsx# Prévia do contrato (área de impressão)
 │   ├── Metric.tsx         # Card de métrica do dashboard
 │   ├── SignaturePad.tsx   # Canvas de assinatura (desenho + limpar)
+│   ├── ShareLink.tsx      # Bloco de compartilhar link (copiar + e-mail)
 │   └── ProtectedRoute.tsx # Rota protegida por autenticação
 ├── context/
 │   └── AuthContext.tsx    # Estado global de autenticação (useContext)
@@ -79,16 +94,18 @@ src/
 │   ├── useContracts.ts    # Custom hook de contratos (CRUD + assinar)
 │   ├── useClients.ts      # Custom hook da agenda de clientes (CRUD)
 │   └── useLocalStorage.ts # Custom hook de persistência
-├── pages/                 # 6 páginas / rotas
+├── pages/                 # 7 páginas / rotas
 │   ├── Home.tsx           # /                    → Landing page
 │   ├── Login.tsx          # /login               → Autenticação
 │   ├── Dashboard.tsx      # /dashboard           → Contratos + métricas + editar/excluir/assinar
 │   ├── NovoContrato.tsx   # /novo-contrato       → Wizard de geração
 │   │                      # /novo-contrato/:id   → Edição de contrato
 │   ├── Clientes.tsx       # /clientes            → Agenda de clientes (CRUD)
-│   └── Perfil.tsx         # /perfil              → Dados e termos padrão
+│   ├── Perfil.tsx         # /perfil              → Dados e termos padrão
+│   └── Assinar.tsx        # /assinar/:id         → Assinatura PÚBLICA do cliente (sem login)
 ├── services/
-│   └── api.ts             # Camada de API (mock + fetch pronto p/ backend real)
+│   ├── api.ts             # Camada de API (mock + fetch pronto p/ backend real)
+│   └── pdf.ts             # Geração do PDF do contrato (jsPDF, sob demanda)
 ├── types/
 │   └── index.ts           # Tipos compartilhados (Contract, Profile…)
 ├── App.tsx                # Configuração das rotas (react-router-dom)
@@ -109,9 +126,9 @@ src/
 
 ## 🔌 Integração com API (ponto extra)
 
-A pasta `src/services/api.ts` expõe as funções `getContracts`, `createContract`,
-`updateContract`, `deleteContract`, `signContract`, `getClients`, `saveClient`,
-`updateClient`, `deleteClient`, `getProfile` e `updateProfile`.
+A pasta `src/services/api.ts` expõe as funções `getContracts`, `getContract`,
+`createContract`, `updateContract`, `deleteContract`, `signContract`, `getClients`,
+`saveClient`, `updateClient`, `deleteClient`, `getProfile` e `updateProfile`.
 
 - **Modo mock (padrão):** enquanto `VITE_API_URL` não estiver definida, as funções
   retornam `Promise`s com dados simulados e latência de rede — e **persistem contratos,
@@ -127,10 +144,11 @@ Basta o backend implementar os endpoints REST abaixo (mesmos nomes já usados no
 | Método | Endpoint          | Descrição                             |
 | ------ | ----------------- | ------------------------------------- |
 | GET    | `/contracts`      | Lista os contratos                    |
+| GET    | `/contracts/:id`  | Busca 1 contrato (usado pela página pública de assinatura) |
 | POST   | `/contracts`      | Cria um novo contrato                 |
 | PUT    | `/contracts/:id`  | Atualiza (edita) um contrato          |
 | DELETE | `/contracts/:id`  | Exclui um contrato                    |
-| POST   | `/contracts/:id/sign` | Assina o contrato (status + data/hora automática) |
+| POST   | `/contracts/:id/sign` | Assina como `prestador` ou `contratante` (`{ por, imagem?, quem }`) — grava data/hora automática e só muda o status para *assinado* quando **as duas** assinaturas existem |
 | GET    | `/clients`        | Lista a agenda de clientes            |
 | POST   | `/clients`        | Salva um cliente (upsert por e-mail)  |
 | PUT    | `/clients/:id`    | Atualiza um cliente                   |
@@ -184,9 +202,16 @@ Basta o backend implementar os endpoints REST abaixo (mesmos nomes já usados no
 
 ![Clientes](docs/print/clientes.png)
 
-### 7. Assinatura do contrato (modal com data/hora automática)
+### 7. Assinatura do contrato (modal: escolher prestador ou contratante)
 
 ![Assinatura](docs/print/assinatura.png)
+
+### 8. Página pública de assinatura (`/assinar/:id`) — cliente assina sem login
+
+> A assinatura de cada parte fica **alinhada por cima da linha do nome**, com o carimbo
+> de data/hora embaixo — no contrato, no PDF e no envio por e-mail.
+
+![Assinatura pública](docs/print/assinatura-publica.png)
 
 ---
 
@@ -242,15 +267,19 @@ git push -u origin main
 ## ✅ Requisitos acadêmicos atendidos
 
 - [x] React.js + TypeScript inicializado via **Vite**
-- [x] **11 arquivos de componentes funcionais** em `src/components/` (13 componentes:
+- [x] **12 arquivos de componentes funcionais** em `src/components/` (14 componentes:
       `Input`, `Textarea` e `Select` contam como 3 — mínimo exigido: 8)
-- [x] **6 páginas** com React Router: `/`, `/login`, `/dashboard`, `/novo-contrato`
-      (e `/novo-contrato/:id` para edição), `/clientes`, `/perfil` (mínimo exigido: 5)
+- [x] **7 páginas** com React Router: `/`, `/login`, `/dashboard`, `/novo-contrato`
+      (e `/novo-contrato/:id` para edição), `/clientes`, `/perfil` e a página pública
+      `/assinar/:id` (mínimo exigido: 5)
 - [x] **7 hooks diferentes**: `useState`, `useEffect`, `useContext`, `useRef`
       + custom hooks `useContracts`, `useClients` e `useLocalStorage` (mínimo exigido: 4)
 - [x] CRUD completo: editar/excluir contratos e cadastrar/editar/excluir clientes
       com persistência de dados
-- [x] **Assinatura de contrato** com canvas, status automático para *assinado* e
-      carimbo de data/hora registrado pelo app
+- [x] **Assinatura em duas partes** (prestador + contratante) com canvas, alinhada
+      por cima da linha de cada nome, status automático para *assinado* quando as
+      duas assinaturas existem e carimbo de data/hora registrado pelo app
+- [x] **Link público de assinatura** (`/assinar/:id`) para o cliente assinar sem
+      conta + **download do PDF assinado** (jsPDF) com assinaturas e carimbos
 - [x] Camada de API preparada para backend REST (`src/services/api.ts`)
 - [x] README com instalação, equipe, prints e instruções de deploy

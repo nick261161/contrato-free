@@ -6,7 +6,7 @@ import {
   signContract as apiSignContract,
   updateContract as apiUpdateContract,
 } from '../services/api'
-import type { Contract } from '../types'
+import type { Contract, SignRole } from '../types'
 
 type ContractPayload = Omit<Contract, 'id' | 'criadoEm'>
 
@@ -54,10 +54,13 @@ export function useContracts() {
     setContracts((current) => current.filter((c) => c.id !== id))
   }
 
-  /** Assina o contrato: status → "assinado" + carimbo de data/hora automático. */
+  /**
+   * Registra a assinatura de uma das partes (prestador = você, contratante =
+   * cliente). O contrato fica "assinado" quando as duas assinaturas existem.
+   */
   async function sign(
     id: string,
-    signature: { por: string; imagem?: string },
+    signature: { por: string; imagem?: string; quem: SignRole },
   ): Promise<Contract> {
     const signed = await apiSignContract(id, signature)
     setContracts((current) => current.map((c) => (c.id === id ? signed : c)))

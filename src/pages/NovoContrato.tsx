@@ -12,11 +12,13 @@ import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input, Select, Textarea } from '../components/Input'
 import { Modal } from '../components/Modal'
+import { ShareLink } from '../components/ShareLink'
 import { Sidebar } from '../components/Sidebar'
 import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { getContracts, getProfile } from '../services/api'
+import { downloadContractPdf } from '../services/pdf'
 import type { Contract, FreelancerProfile } from '../types'
 
 interface WizardState {
@@ -68,6 +70,8 @@ export function NovoContrato() {
   // useState: contrato sendo editado (null = criando novo)
   const [editing, setEditing] = useState<Contract | null>(null)
   const [naoEncontrado, setNaoEncontrado] = useState(false)
+  const [baixandoPdf, setBaixandoPdf] = useState(false)
+  const [clienteSalvoId, setClienteSalvoId] = useState('')
 
   // useRef: aponta para a div do contrato gerado (usada na impressão/exportação em PDF)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -150,12 +154,15 @@ export function NovoContrato() {
     descricao: form.descricao,
     status: editing?.status ?? 'rascunho',
     criadoEm: editing?.criadoEm ?? new Date().toISOString(),
-    assinatura: editing?.assinatura,
+    assinaturaPrestador: editing?.assinaturaPrestador,
+    assinaturaContratante: editing?.assinaturaContratante,
   }
 
   function update(field: keyof WizardState, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: undefined }))
+    // editar manualmente os dados do cliente "desvincula" o cliente salvo escolhido
+    if (field.startsWith('cliente')) setClienteSalvoId('')
   }
 
   /** Preenche os campos do cliente ao escolher um contato já salvo. */
@@ -166,6 +173,7 @@ export function NovoContrato() {
     const found = clients.find((c) => c.id === value)
     if (!found) return
 
+    setClienteSalvoId(value)
     setForm((current) => ({
       ...current,
       clienteNome: found.nome,
@@ -214,6 +222,17 @@ export function NovoContrato() {
     document.title = `contrato-${form.titulo || 'sem-titulo'}`
     window.print()
     document.title = tituloAnterior
+  }
+
+  /** Baixa o contrato em PDF (arquivo real, com dados preenchidos). */
+  async function handleDownloadPdf() {
+    if (!sucesso) return
+    setBaixandoPdf(true)
+    try {
+      await downloadContractPdf(sucesso)
+    } finally {
+      setBaixandoPdf(false)
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -331,7 +350,7 @@ export function NovoContrato() {
                     name="clienteSalvo"
                     options={clientOptions}
                     onChange={handleSelectClient}
-                    value=""
+                    value={clienteSalvoId}
                     hint={
                       clients.length === 0
                         ? 'Nenhum cliente salvo ainda — um cliente é salvo automaticamente ao gerar contratos.'
@@ -496,8 +515,16 @@ export function NovoContrato() {
         onClose={() => setSucesso(null)}
         footer={
           <>
+            <Button
+              variant="secondary"
+              onClick={() => void handleDownloadPdf()}
+              type="button"
+              disabled={baixandoPdf}
+            >
+              {baixandoPdf ? 'Gerando…' : '⬇️ Baixar PDF'}
+            </Button>
             <Button variant="secondary" onClick={handleExport} type="button">
-              Imprimir / PDF
+              🖨️ Imprimir / PDF
             </Button>
             <Button
               onClick={() => {
@@ -522,6 +549,7 @@ export function NovoContrato() {
           <strong>{sucesso?.cliente.nome}</strong>. Os dados do cliente ficaram salvos na
           sua agenda.
         </p>
+        {sucesso && <ShareLink contractId={sucesso.id} titulo={sucesso.titulo} />}
       </Modal>
 
       <Footer />

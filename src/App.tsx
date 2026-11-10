@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
+import { Assinar } from './pages/Assinar'
 import { Clientes } from './pages/Clientes'
 import { Dashboard } from './pages/Dashboard'
 import { Home } from './pages/Home'
@@ -17,6 +18,9 @@ export default function App() {
 
         {/* 2. Autenticação do freelancer */}
         <Route path="/login" element={<Login />} />
+
+        {/* Página PÚBLICA: cliente recebe o link e assina sem login */}
+        <Route path="/assinar/:id" element={<Assinar />} />
 
         {/* 3. Painel de contratos e métricas (protegida) */}
         <Route

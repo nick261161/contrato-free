@@ -12,7 +12,14 @@
  *   VITE_API_URL=http://localhost:3001
  * e implementar os endpoints REST listados no README.
  */
-import type { Client, Contract, FreelancerProfile, SavedClient } from '../types'
+import type {
+  Client,
+  Contract,
+  FreelancerProfile,
+  SavedClient,
+  SignRole,
+  Signature,
+} from '../types'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const MOCK_DELAY_MS = 600
@@ -133,7 +140,24 @@ const seedClients: SavedClient[] = seedContracts.map((contract, index) => ({
   criadoEm: contract.criadoEm,
 }))
 
-let mockContracts: Contract[] = loadLocal(CONTRACTS_KEY, seedContracts)
+/**
+ * Migra contratos gravados em versões antigas da app: existia um campo único
+ * `assinatura` (hoje separado em `assinaturaPrestador` / `assinaturaContratante`)
+ * e o status só passa a "assinado" quando as DUAS assinaturas estão presentes.
+ */
+function migrateContracts(list: Contract[]): Contract[] {
+  return list.map((raw) => {
+    const legado = raw as Contract & { assinatura?: Signature }
+    if (!legado.assinatura) return raw
+
+    const { assinatura, ...resto } = legado
+    const migrado: Contract = { ...resto, assinaturaContratante: assinatura }
+    if (migrado.status !== 'concluido') migrado.status = 'pendente'
+    return migrado
+  })
+}
+
+let mockContracts: Contract[] = migrateContracts(loadLocal(CONTRACTS_KEY, seedContracts))
 let mockClients: SavedClient[] = loadLocal(CLIENTS_KEY, seedClients)
 let mockProfile: FreelancerProfile = loadLocal(PROFILE_KEY, seedProfile)
 
@@ -173,6 +197,16 @@ function upsertClientSync(client: Client): SavedClient {
 export async function getContracts(): Promise<Contract[]> {
   if (isMockMode) return delay(mockContracts)
   return request<Contract[]>('/contracts')
+}
+
+/** Busca um contrato pelo id (usado pela página pública de assinatura). */
+export async function getContract(id: string): Promise<Contract> {
+  if (isMockMode) {
+    const found = mockContracts.find((c) => c.id === id)
+    if (!found) throw new Error('Contrato não encontrado.')
+    return delay(found, 400)
+  }
+  return request<Contract>(`/contracts/${id}`)
 }
 
 export async function createContract(payload: Omit<Contract, 'id' | 'criadoEm'>): Promise<Contract> {
@@ -224,27 +258,41 @@ export async function deleteContract(id: string): Promise<void> {
 }
 
 /**
- * Assina um contrato: muda o status para "assinado" e grava quem assinou,
- * a data/hora (detectada aqui, automaticamente) e o desenho opcional.
+ * Registra a assinatura de uma das partes do contrato:
+ * - `prestador` = o freelancer (assina no dashboard);
+ * - `contratante` = o cliente (assina pelo link público /assinar/:id).
+ *
+ * Grava quem assinou, a data/hora (detectada aqui, automaticamente) e o desenho
+ * opcional. O status só vira "assinado" quando as DUAS assinaturas existem.
  * POST /contracts/:id/sign
  */
 export async function signContract(
   id: string,
-  signature: { por: string; imagem?: string },
+  signature: { por: string; imagem?: string; quem: SignRole },
 ): Promise<Contract> {
   if (isMockMode) {
     const index = mockContracts.findIndex((c) => c.id === id)
     if (index === -1) throw new Error('Contrato não encontrado.')
 
-    const updated: Contract = {
-      ...mockContracts[index],
-      status: 'assinado',
-      assinatura: {
-        por: signature.por.trim(),
-        em: new Date().toISOString(),
-        imagem: signature.imagem,
-      },
+    const atual = mockContracts[index]
+    const nova: Signature = {
+      por: signature.por.trim(),
+      em: new Date().toISOString(),
+      imagem: signature.imagem,
     }
+
+    const updated: Contract =
+      signature.quem === 'prestador'
+        ? { ...atual, assinaturaPrestador: nova }
+        : { ...atual, assinaturaContratante: nova }
+
+    updated.status =
+      updated.assinaturaPrestador && updated.assinaturaContratante
+        ? 'assinado'
+        : updated.status === 'concluido'
+          ? 'concluido'
+          : 'pendente'
+
     mockContracts[index] = updated
     commitContracts()
     return delay(updated, 450)

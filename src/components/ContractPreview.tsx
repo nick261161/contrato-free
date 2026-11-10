@@ -1,5 +1,5 @@
 import type { Ref } from 'react'
-import type { Contract, FreelancerProfile } from '../types'
+import type { Contract, FreelancerProfile, Signature } from '../types'
 
 interface ContractPreviewProps {
   contract: Contract
@@ -15,6 +15,51 @@ const currency = new Intl.NumberFormat('pt-BR', {
 function formatDate(iso: string): string {
   if (!iso) return '—'
   return new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR')
+}
+
+interface SignatureSlotProps {
+  signature?: Signature
+  nome: string
+  papel: string
+}
+
+/**
+ * Coluna de assinatura: o desenho/nome digitado fica ALINHADO por cima da
+ * linha, com o nome da parte embaixo — como num contrato de papel. Quando a
+ * parte ainda não assinou, o espaço fica reservado com o aviso de pendência.
+ */
+function SignatureSlot({ signature, nome, papel }: SignatureSlotProps) {
+  return (
+    <div className="preview__sig">
+      <div className="preview__sig-area">
+        {signature?.imagem ? (
+          <img
+            className="preview__sig-img"
+            src={signature.imagem}
+            alt={`Assinatura de ${signature.por}`}
+          />
+        ) : signature ? (
+          <p className="preview__signature-typed">{signature.por}</p>
+        ) : (
+          <span className="preview__sig-pending">
+            {papel} — aguardando assinatura
+          </span>
+        )}
+      </div>
+
+      <div className="preview__line" />
+      <span className="preview__sig-name">{nome}</span>
+
+      {signature ? (
+        <span className="preview__sig-stamp">
+          Assinado por <strong>{signature.por}</strong> em{' '}
+          {new Date(signature.em).toLocaleString('pt-BR')}
+        </span>
+      ) : (
+        <span className="preview__sig-hint">Aguardando assinatura</span>
+      )}
+    </div>
+  )
 }
 
 /** Pré-visualização do contrato gerado — também é a área de impressão/exportação em PDF. */
@@ -100,33 +145,17 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
       <section className="preview__section">
         <h3>3. Assinaturas</h3>
 
-        {contract.assinatura && (
-          <div className="preview__signature-stamp">
-            {contract.assinatura.imagem ? (
-              <img
-                src={contract.assinatura.imagem}
-                alt={`Assinatura de ${contract.assinatura.por}`}
-              />
-            ) : (
-              <p className="preview__signature-typed">{contract.assinatura.por}</p>
-            )}
-            <span>
-              Assinado por <strong>{contract.assinatura.por}</strong> em{' '}
-              {new Date(contract.assinatura.em).toLocaleString('pt-BR')} — registro
-              automático da plataforma.
-            </span>
-          </div>
-        )}
-
         <div className="preview__signatures">
-          <div>
-            <div className="preview__line" />
-            <span>{profile.nome || 'Prestador'}</span>
-          </div>
-          <div>
-            <div className="preview__line" />
-            <span>{contract.cliente.nome || 'Contratante'}</span>
-          </div>
+          <SignatureSlot
+            signature={contract.assinaturaPrestador}
+            nome={profile.nome || 'Prestador'}
+            papel="Prestador"
+          />
+          <SignatureSlot
+            signature={contract.assinaturaContratante}
+            nome={contract.cliente.nome || 'Contratante'}
+            papel="Contratante"
+          />
         </div>
       </section>
 

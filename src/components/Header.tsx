@@ -17,30 +17,34 @@ export function Header() {
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'is-active' : '')}>
             Início
           </NavLink>
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) => (isActive ? 'is-active' : '')}
-          >
-            Dashboard
-          </NavLink>
-          <NavLink
-            to="/novo-contrato"
-            className={({ isActive }) => (isActive ? 'is-active' : '')}
-          >
-            Novo contrato
-          </NavLink>
-          <NavLink
-            to="/clientes"
-            className={({ isActive }) => (isActive ? 'is-active' : '')}
-          >
-            Clientes
-          </NavLink>
-          <NavLink
-            to="/perfil"
-            className={({ isActive }) => (isActive ? 'is-active' : '')}
-          >
-            Perfil
-          </NavLink>
+          {user && (
+            <>
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) => (isActive ? 'is-active' : '')}
+              >
+                Dashboard
+              </NavLink>
+              <NavLink
+                to="/novo-contrato"
+                className={({ isActive }) => (isActive ? 'is-active' : '')}
+              >
+                Novo contrato
+              </NavLink>
+              <NavLink
+                to="/clientes"
+                className={({ isActive }) => (isActive ? 'is-active' : '')}
+              >
+                Clientes
+              </NavLink>
+              <NavLink
+                to="/perfil"
+                className={({ isActive }) => (isActive ? 'is-active' : '')}
+              >
+                Perfil
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div className="header__actions">

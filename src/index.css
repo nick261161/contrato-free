@@ -1062,6 +1062,27 @@ img {
   color: var(--success);
 }
 
+.contract-card__signed--pending {
+  color: var(--warning);
+}
+
+.contract-detail__sigs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+}
+
+.contract-detail__sig {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.contract-detail__sig > strong {
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
 .contract-detail__signed {
   display: flex;
   flex-direction: column;
@@ -1069,7 +1090,7 @@ img {
 }
 
 .contract-detail__signature-img {
-  max-width: 220px;
+  max-width: 100%;
   max-height: 90px;
   background: #fff;
   border: 1px dashed var(--border);
@@ -1145,33 +1166,11 @@ img {
   color: var(--danger, #dc2626);
 }
 
-.preview__signature-stamp {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  padding: 0.8rem;
-  margin-top: 0.8rem;
-  text-align: center;
-}
-
-.preview__signature-stamp img {
-  max-width: 200px;
-  max-height: 80px;
-}
-
 .preview__signature-typed {
   font-family: 'Segoe Script', 'Brush Script MT', cursive;
   font-size: 1.5rem;
   color: var(--text);
   margin: 0;
-}
-
-.preview__signature-stamp span {
-  font-size: 0.72rem;
-  color: var(--text-soft);
 }
 
 /* ---------------- Wizard ---------------- */
@@ -1390,12 +1389,40 @@ img {
   color: var(--text-soft);
 }
 
+/* Coluna de assinatura: o desenho fica alinhado por cima da linha, com o
+   nome da parte embaixo — como num contrato de papel. */
 .preview__signatures {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.6rem;
-  margin-top: 2rem;
+  margin-top: 1.2rem;
   text-align: center;
+}
+
+.preview__sig {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview__sig-area {
+  min-height: 74px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0.4rem 0.4rem;
+}
+
+.preview__sig-img {
+  max-height: 68px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.preview__sig-pending {
+  font-size: 0.74rem;
+  font-style: italic;
+  color: var(--text-soft);
+  opacity: 0.75;
 }
 
 .preview__line {
@@ -1403,9 +1430,18 @@ img {
   margin-bottom: 0.35rem;
 }
 
-.preview__signatures span {
-  font-size: 0.78rem;
+.preview__sig-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 0.3rem;
+}
+
+.preview__sig-stamp,
+.preview__sig-hint {
+  font-size: 0.7rem;
   color: var(--text-soft);
+  margin-top: 0.25rem;
 }
 
 .preview__footnote {
@@ -1551,6 +1587,14 @@ select.field__control {
   .wizard__preview {
     position: static;
   }
+
+  .assinar {
+    grid-template-columns: 1fr;
+  }
+
+  .assinar__panel {
+    position: static;
+  }
 }
 
 @media (max-width: 860px) {
@@ -1591,6 +1635,138 @@ select.field__control {
     gap: 1.4rem;
     flex-wrap: wrap;
   }
+
+  .share__row {
+    flex-wrap: wrap;
+  }
+
+  .contract-detail__sigs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------- Página pública de assinatura ---------------- */
+.container.public {
+  min-height: 50vh;
+  padding-top: 2.2rem;
+  padding-bottom: 3rem;
+}
+
+.public__head {
+  margin-bottom: 1.5rem;
+}
+
+.public__head h1 {
+  font-size: 1.7rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.public__head p {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.assinar {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.assinar__panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+  position: sticky;
+  top: 1rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.assinar__panel h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.7rem;
+}
+
+.assinar__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.assinar__submit {
+  margin-top: 0.6rem;
+}
+
+.assinar__done {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.assinar__done h2 {
+  color: var(--success);
+  margin-bottom: 0;
+}
+
+.assinar__done p {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.assinar__actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.assinar__preview {
+  min-width: 0;
+}
+
+/* ---------------- Compartilhar link ---------------- */
+.share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.share__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.share__row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.share__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  background: var(--bg);
+}
+
+.share__hint {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.contract-detail__actions {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 1rem;
 }
 
 /* ---------------- Impressão (exportar PDF) ---------------- */

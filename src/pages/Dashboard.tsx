@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ContractCard } from '../components/ContractCard'
 import { Button } from '../components/Button'
@@ -6,10 +7,13 @@ import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Metric } from '../components/Metric'
 import { Modal } from '../components/Modal'
+import { ShareLink } from '../components/ShareLink'
 import { Sidebar } from '../components/Sidebar'
 import { SignaturePad } from '../components/SignaturePad'
 import { useContracts } from '../hooks/useContracts'
-import type { Contract } from '../types'
+import { getProfile } from '../services/api'
+import { downloadContractPdf } from '../services/pdf'
+import type { Contract, SignRole } from '../types'
 import { STATUS_LABEL } from '../types'
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -26,10 +30,20 @@ export function Dashboard() {
 
   // useState: fluxo de assinatura (quem assina + desenho no canvas)
   const [assinando, setAssinando] = useState<Contract | null>(null)
+  const [quem, setQuem] = useState<SignRole>('prestador')
+  const [nomePrestador, setNomePrestador] = useState('')
   const [assinante, setAssinante] = useState('')
   const [desenho, setDesenho] = useState<string | null>(null)
   const [assinandoSalvando, setAssinandoSalvando] = useState(false)
   const [erroAssinatura, setErroAssinatura] = useState<string | null>(null)
+  const [baixandoPdf, setBaixandoPdf] = useState(false)
+
+  // useEffect: carrega o nome do prestador (para sugerir na assinatura)
+  useEffect(() => {
+    getProfile()
+      .then((perfil) => setNomePrestador(perfil.nome))
+      .catch(() => undefined)
+  }, [])
 
   const metrics = useMemo(() => {
     const total = contracts.length
@@ -61,15 +75,35 @@ export function Dashboard() {
     setRemovendo(false)
   }
 
-  /** Abre o modal de assinatura com o nome do cliente já sugerido. */
+  /** Abre o modal de assinatura — por padrão, como prestador (você). */
   function openSign(contract: Contract) {
     setAssinando(contract)
-    setAssinante(contract.cliente.nome)
+    setQuem('prestador')
+    setAssinante(nomePrestador)
+    setDesenho(null)
+    setErroAssinatura(null)
+
+    // perfil ainda não carregado: busca agora para sugerir o nome certo
+    if (!nomePrestador) {
+      getProfile()
+        .then((perfil) => {
+          setNomePrestador(perfil.nome)
+          setAssinante(perfil.nome)
+        })
+        .catch(() => undefined)
+    }
+  }
+
+  /** Troca a parte que está assinando e sugere o nome dela. */
+  function handleRoleChange(event: ChangeEvent<HTMLSelectElement>) {
+    const novo = event.target.value as SignRole
+    setQuem(novo)
+    setAssinante(novo === 'prestador' ? nomePrestador : assinando?.cliente.nome ?? '')
     setDesenho(null)
     setErroAssinatura(null)
   }
 
-  /** Assina: grava quem assinou + data/hora automática e muda o status. */
+  /** Assina: grava quem assinou + data/hora automática na coluna da parte. */
   async function handleSign() {
     if (!assinando) return
     if (!assinante.trim()) {
@@ -83,6 +117,7 @@ export function Dashboard() {
       const signed = await signContract(assinando.id, {
         por: assinante.trim(),
         imagem: desenho ?? undefined,
+        quem,
       })
       setSelected(signed)
       setAssinando(null)
@@ -102,6 +137,17 @@ export function Dashboard() {
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  /** Baixa o PDF do contrato (com assinatura e carimbo, quando houver). */
+  async function handleDownloadPdf() {
+    if (!selected) return
+    setBaixandoPdf(true)
+    try {
+      await downloadContractPdf(selected)
+    } finally {
+      setBaixandoPdf(false)
+    }
   }
 
   return (
@@ -187,7 +233,7 @@ export function Dashboard() {
         footer={
           <>
             {selected &&
-              (selected.status === 'rascunho' || selected.status === 'pendente') && (
+              !(selected.assinaturaPrestador && selected.assinaturaContratante) && (
                 <Button
                   variant="primary"
                   onClick={() => openSign(selected)}
@@ -241,28 +287,70 @@ export function Dashboard() {
             </div>
 
             <div className="contract-detail__block contract-detail__block--signature">
-              <span>Assinatura</span>
-              {selected.assinatura ? (
-                <div className="contract-detail__signed">
-                  {selected.assinatura.imagem && (
-                    <img
-                      src={selected.assinatura.imagem}
-                      alt={`Assinatura de ${selected.assinatura.por}`}
-                      className="contract-detail__signature-img"
-                    />
+              <span>Assinaturas (prestador + contratante)</span>
+              <div className="contract-detail__sigs">
+                <div className="contract-detail__sig">
+                  <strong>Prestador — você</strong>
+                  {selected.assinaturaPrestador ? (
+                    <div className="contract-detail__signed">
+                      {selected.assinaturaPrestador.imagem && (
+                        <img
+                          src={selected.assinaturaPrestador.imagem}
+                          alt={`Assinatura de ${selected.assinaturaPrestador.por}`}
+                          className="contract-detail__signature-img"
+                        />
+                      )}
+                      <p>
+                        Assinado por <strong>{selected.assinaturaPrestador.por}</strong>{' '}
+                        em <strong>{formatStamp(selected.assinaturaPrestador.em)}</strong>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="contract-detail__unsigned">
+                      Aguardando você assinar — use o botão “Assinar contrato”.
+                    </p>
                   )}
-                  <p>
-                    Assinado por <strong>{selected.assinatura.por}</strong> em{' '}
-                    <strong>{formatStamp(selected.assinatura.em)}</strong> — data/hora
-                    registrada automaticamente pelo app.
-                  </p>
                 </div>
-              ) : (
-                <p className="contract-detail__unsigned">
-                  Aguardando assinatura — use o botão “Assinar contrato” para registrar.
-                </p>
-              )}
+
+                <div className="contract-detail__sig">
+                  <strong>Contratante — {selected.cliente.nome}</strong>
+                  {selected.assinaturaContratante ? (
+                    <div className="contract-detail__signed">
+                      {selected.assinaturaContratante.imagem && (
+                        <img
+                          src={selected.assinaturaContratante.imagem}
+                          alt={`Assinatura de ${selected.assinaturaContratante.por}`}
+                          className="contract-detail__signature-img"
+                        />
+                      )}
+                      <p>
+                        Assinado por{' '}
+                        <strong>{selected.assinaturaContratante.por}</strong> em{' '}
+                        <strong>{formatStamp(selected.assinaturaContratante.em)}</strong>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="contract-detail__unsigned">
+                      Aguardando o cliente — envie o link abaixo ou assine presencialmente
+                      pelo botão “Assinar contrato”.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
+
+            <div className="contract-detail__actions">
+              <Button
+                variant="secondary"
+                onClick={() => void handleDownloadPdf()}
+                type="button"
+                disabled={baixandoPdf}
+              >
+                {baixandoPdf ? 'Gerando PDF…' : '⬇️ Baixar PDF'}
+              </Button>
+            </div>
+
+            <ShareLink contractId={selected.id} titulo={selected.titulo} />
           </div>
         )}
       </Modal>
@@ -327,10 +415,26 @@ export function Dashboard() {
       >
         <div className="sign-form">
           <p className="sign-form__hint">
-            Contrato <strong>{assinando?.titulo}</strong> — ao confirmar, o app grava
-            automaticamente <strong>quem assinou</strong> e a <strong>data/hora</strong>{' '}
-            da assinatura, e o status muda para <strong>Assinado</strong>.
+            Contrato <strong>{assinando?.titulo}</strong> — escolha quem está assinando.
+            O app grava automaticamente <strong>quem assinou</strong> e a{' '}
+            <strong>data/hora</strong> no espaço da parte; o contrato fica{' '}
+            <strong>Assinado</strong> quando as duas assinaturas estiverem registradas.
           </p>
+
+          <label className="field__label" htmlFor="quem-assina">
+            Assinar como
+          </label>
+          <select
+            id="quem-assina"
+            className="field__control"
+            value={quem}
+            onChange={handleRoleChange}
+          >
+            <option value="prestador">Prestador — você (freelancer)</option>
+            <option value="contratante">
+              Contratante — {assinando?.cliente.nome ?? 'cliente'}
+            </option>
+          </select>
 
           <label className="field__label" htmlFor="assinante">
             Nome de quem assina

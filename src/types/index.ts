@@ -18,6 +18,13 @@ export interface Signature {
   imagem?: string
 }
 
+/**
+ * Qual parte do contrato está assinando:
+ * - `prestador` = o freelancer (assinado no painel);
+ * - `contratante` = o cliente (assinado pelo link público /assinar/:id).
+ */
+export type SignRole = 'prestador' | 'contratante'
+
 export interface Contract {
   id: string
   titulo: string
@@ -28,7 +35,10 @@ export interface Contract {
   descricao: string
   status: ContractStatus
   criadoEm: string
-  assinatura?: Signature
+  /** Assinatura do prestador (freelancer) — registrada no dashboard. */
+  assinaturaPrestador?: Signature
+  /** Assinatura do contratante (cliente) — registrada pelo link público. */
+  assinaturaContratante?: Signature
 }
 
 export interface FreelancerProfile {
