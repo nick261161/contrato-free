@@ -1,7 +1,8 @@
 # 📄 ContratoFree — Automação de Contratos para Freelancers
 
-> Plataforma web desenvolvida em **React.js + TypeScript (Vite)** para automatizar o
-> fechamento e a geração de contratos de prestação de serviços por freelancers.
+> Plataforma web desenvolvida em **React.js + TypeScript (Vite)** com **API REST
+> (Express + PostgreSQL)** e serviços gerenciados no **Neon**: banco **PostgreSQL**
+> (branch `production`) e login com **Neon Auth** (Managed Better Auth).
 
 O freelancer preenche um wizard curto (cliente → escopo e valores → revisão), a
 plataforma monta o contrato com os termos padrão salvos no perfil, exibe uma prévia em
@@ -29,51 +30,73 @@ métricas no dashboard e **baixar o PDF assinado** (ou imprimir).
   nos detalhes do contrato, no wizard e na página pública;
 - 👥 **Agenda de clientes** (`/clientes`) — cadastro, edição e exclusão de clientes,
   com contagem de contratos vinculados;
-- 💾 **Persistência** — contratos, clientes e perfil ficam salvos (localStorage no modo
-  mock) e sobrevivem ao F5; os clientes são reutilizáveis no wizard por um seletor.
+- 💾 **Persistência real no Neon (PostgreSQL)** — a API em `server/` grava contratos,
+  clientes e perfil no PostgreSQL do Neon (branch `production`); os clientes são
+  reutilizáveis no wizard por um seletor;
+- 🔐 **Login real com Neon Auth** — cadastro e entrada com e-mail/senha (mínimo de 8
+  caracteres) gerenciados pelo **Neon Auth (Managed Better Auth)**, na mesma branch
+  do banco: a sessão sobrevive ao F5 e as rotas internas ficam protegidas.
 
-> ⚠️ **Modo mock (padrão):** sem backend, os dados ficam no `localStorage` do navegador,
-> então o link de assinatura abre **no mesmo navegador/computador**. Configurando
-> `VITE_API_URL` para um backend real (abaixo), o cliente abre o link de qualquer lugar.
+> ℹ️ **Modo mock (fallback):** sem `VITE_API_URL`, os dados ficam no `localStorage`
+> do navegador e o link de assinatura abre **no mesmo navegador/computador**. Com a
+> API real configurada, o cliente abre o link de qualquer lugar.
 
 ---
 
 ## 🚀 Instalação e execução
 
-Pré-requisitos: [Node.js](https://nodejs.org) LTS (>= 18) e npm.
+Pré-requisitos: [Node.js](https://nodejs.org) LTS (>= 18), npm e o
+[Neon CLI](https://neon.com/docs/cli/introduction) (`npm i -g neon`).
 
 ```bash
 # 1. Clone o repositório
 git clone https://github.com/<seu-usuario>/contrato-free.git
 cd contrato-free
 
-# 2. Instale as dependências
+# 2. Instale as dependências (front + API)
 npm install
+npm --prefix server install
 
-# 3. (Opcional) configure a URL do backend REST — ver seção "Integração com API"
-copy .env.example .env      # Windows
-# cp .env.example .env      # macOS/Linux
+# 3. Gere as variáveis do Neon (.env.local — gitignored)
+neon login          # só na primeira vez (abre o navegador)
+neon deploy         # provisiona Postgres + Auth e puxa DATABASE_URL, NEON_AUTH_*, VITE_*
 
-# 4. Inicie o ambiente de desenvolvimento
+# 4. Inicie API (http://localhost:3001) + front (http://localhost:5173)
 npm run dev
 ```
 
-A aplicação ficará disponível em **http://localhost:5173**.
+> O `.env.local` traz `DATABASE_URL`/`DATABASE_URL_UNPOOLED` (Postgres),
+> `NEON_AUTH_BASE_URL`/`NEON_AUTH_JWKS_URL` (Auth) e as variáveis `VITE_*` usadas
+> pelo front (`VITE_API_URL`, `VITE_NEON_AUTH_URL`). É gerado pelo `neon deploy` —
+> **nunca** versione esse arquivo.
 
 ### Scripts disponíveis
 
-| Comando           | Descrição                                  |
-| ----------------- | ------------------------------------------ |
-| `npm run dev`     | Sobe o servidor de desenvolvimento (Vite)  |
-| `npm run build`   | Gera o build de produção em `dist/`        |
-| `npm run preview` | Visualiza o build de produção localmente   |
-| `npm run lint`    | Executa o linter (oxlint)                  |
+| Comando           | Descrição                                                  |
+| ----------------- | ---------------------------------------------------------- |
+| `npm run dev`     | API (Express, :3001) **e** front (Vite, :5173) juntos      |
+| `npm run api`     | Só a API REST (`server/index.js`)                          |
+| `npm run web`     | Só o front (Vite)                                          |
+| `npm run build`   | Gera o build de produção em `dist/`                        |
+| `npm run preview` | Visualiza o build de produção localmente                   |
+| `npm run lint`    | Executa o linter (oxlint)                                  |
 
 ---
 
 ## 🧩 Estrutura do projeto
 
 ```
+server/                  # API REST (Express + pg) ligada ao Neon Postgres
+├── index.js             # Sobe o Express (CORS, /health, rotas, erros)
+├── db.js                # Pools Neon (pooled p/ app, unpooled p/ schema) + seed
+├── http.js              # Helpers httpError/wrap
+├── routes/
+│   ├── contracts.js     # CRUD + /sign (duas partes, transação)
+│   ├── clients.js       # CRUD da agenda (upsert por e-mail)
+│   └── profile.js       # GET/PUT do perfil (linha única)
+├── seed.json            # Dados de exemplo (1ª execução do banco)
+└── package.json         # express, cors, dotenv, pg
+neon.ts                  # Configuração do Neon CLI (auth: true + branch policy)
 src/
 ├── components/            # Componentes funcionais reutilizáveis
 │   ├── Header.tsx         # Barra de navegação superior
@@ -89,14 +112,14 @@ src/
 │   ├── ShareLink.tsx      # Bloco de compartilhar link (copiar + e-mail)
 │   └── ProtectedRoute.tsx # Rota protegida por autenticação
 ├── context/
-│   └── AuthContext.tsx    # Estado global de autenticação (useContext)
+│   └── AuthContext.tsx    # Estado global de autenticação (Neon Auth)
 ├── hooks/
 │   ├── useContracts.ts    # Custom hook de contratos (CRUD + assinar)
 │   ├── useClients.ts      # Custom hook da agenda de clientes (CRUD)
-│   └── useLocalStorage.ts # Custom hook de persistência
+│   └── useLocalStorage.ts # Custom hook de persistência (modo mock)
 ├── pages/                 # 7 páginas / rotas
 │   ├── Home.tsx           # /                    → Landing page
-│   ├── Login.tsx          # /login               → Autenticação
+│   ├── Login.tsx          # /login               → Entrar / Criar conta (Neon Auth)
 │   ├── Dashboard.tsx      # /dashboard           → Contratos + métricas + editar/excluir/assinar
 │   ├── NovoContrato.tsx   # /novo-contrato       → Wizard de geração
 │   │                      # /novo-contrato/:id   → Edição de contrato
@@ -104,7 +127,8 @@ src/
 │   ├── Perfil.tsx         # /perfil              → Dados e termos padrão
 │   └── Assinar.tsx        # /assinar/:id         → Assinatura PÚBLICA do cliente (sem login)
 ├── services/
-│   ├── api.ts             # Camada de API (mock + fetch pronto p/ backend real)
+│   ├── api.ts             # Camada de API (REST + fallback mock)
+│   ├── auth.ts            # Cliente do Neon Auth (@neon/auth)
 │   └── pdf.ts             # Geração do PDF do contrato (jsPDF, sob demanda)
 ├── types/
 │   └── index.ts           # Tipos compartilhados (Contract, Profile…)
@@ -124,22 +148,44 @@ src/
 
 ---
 
-## 🔌 Integração com API (ponto extra)
+## 🌩️ Neon (banco + login)
+
+O projeto está vinculado ao Neon CLI (arquivo `.neon`, gitignored) com o projeto
+`contratofree` na branch `production`:
+
+| Serviço      | Como está ligado no código                                              |
+| ------------ | ----------------------------------------------------------------------- |
+| **Postgres** | `server/db.js` conecta com `pg`: `DATABASE_URL` (pooler) para a API e `DATABASE_URL_UNPOOLED` para criação de schema/seed — schema e seed rodam sozinhos na 1ª execução |
+| **Neon Auth**| `src/services/auth.ts` cria o cliente com `@neon/auth` (`createAuthClient` + `BetterAuthReactAdapter`) apontando para `VITE_NEON_AUTH_URL`; `AuthContext` faz `signUp.email`, `signIn.email`, `getSession` e `signOut` |
+
+Comandos úteis (requeem `neon login`):
+
+```bash
+neon deploy              # aplica neon.ts e (re)puxa as env vars para .env.local
+neon neon-auth status    # mostra Base URL / JWKS do Auth da branch
+neon env pull            # só atualiza as variáveis de ambiente
+neon config plan         # mostra o que mudaria na política da branch (dry-run)
+```
+
+> O `neon.ts` declara `auth: true` e a política da branch (branches novas expiram em
+> 7 dias). Não versione `.env.local` — ele contém a senha do banco.
+
+---
+
+## 🔌 Integração com API
 
 A pasta `src/services/api.ts` expõe as funções `getContracts`, `getContract`,
 `createContract`, `updateContract`, `deleteContract`, `signContract`, `getClients`,
 `saveClient`, `updateClient`, `deleteClient`, `getProfile` e `updateProfile`.
 
-- **Modo mock (padrão):** enquanto `VITE_API_URL` não estiver definida, as funções
+- **Backend real (este repositório):** a API REST está implementada em `server/`
+  (Express + `pg`) e grava no PostgreSQL do Neon. `npm run dev` sobe API + front
+  juntos — é o modo padrão quando `.env.local` existe.
+- **Modo mock (fallback):** enquanto `VITE_API_URL` não estiver definida, as funções
   retornam `Promise`s com dados simulados e latência de rede — e **persistem contratos,
   clientes e perfil no `localStorage`** (sobrevivem ao F5).
-- **Backend real:** crie o arquivo `.env` na raiz com a URL do seu backend Node.js:
 
-```env
-VITE_API_URL=http://localhost:3001
-```
-
-Basta o backend implementar os endpoints REST abaixo (mesmos nomes já usados no mock):
+O contrato REST consumido por `services/api.ts` (já implementado no servidor):
 
 | Método | Endpoint          | Descrição                             |
 | ------ | ----------------- | ------------------------------------- |
@@ -155,8 +201,10 @@ Basta o backend implementar os endpoints REST abaixo (mesmos nomes já usados no
 | DELETE | `/clients/:id`    | Exclui um cliente                     |
 | GET    | `/profile`        | Retorna o perfil do freelancer        |
 | PUT    | `/profile`        | Atualiza o perfil                     |
+| GET    | `/health`         | Smoke test da API + banco             |
 
-> Não é preciso alterar os componentes: a troca é feita apenas em `services/api.ts`.
+> Criar/editar um contrato também **sincroniza a agenda de clientes** (upsert por
+> e-mail), dentro da mesma transação.
 
 ---
 
@@ -248,18 +296,28 @@ git push -u origin main
    - **Framework preset:** Vite
    - **Build command:** `npm run build`
    - **Output directory:** `dist`
-4. Se usar backend próprio, adicione a variável `VITE_API_URL` em
-   *Settings → Environment Variables*.
+4. Adicione as variáveis de ambiente em *Settings → Environment Variables*:
+   - `VITE_API_URL` — endereço público da API (`server/`);
+   - `VITE_NEON_AUTH_URL` — URL pública do Neon Auth da branch (a mesma que o
+     `neon deploy` grava como `NEON_AUTH_BASE_URL` no `.env.local`).
 5. Clique em **Deploy**. Como o React Router usa rotas internas, a Vercel já
    redireciona tudo para `index.html` automaticamente.
 
-### Render
+### API (server/) em hospedagem Node (Render, Railway, Fly…)
+
+1. Crie um **Web Service** apontando para o repositório.
+2. Configure **Build:** `npm install && npm --prefix server install` e
+   **Start:** `npm --prefix server start`.
+3. Defina `DATABASE_URL` (e opcional `DATABASE_URL_UNPOOLED`) com o valor do seu
+   `.env.local`. A `/health` responde `{"ok":true,...}` quando o banco responde.
+
+### Render (só o front)
 
 1. Crie um novo **Web Service** apontando para o repositório no GitHub.
 2. Configure:
    - **Build Command:** `npm install && npm run build`
    - **Publish Directory:** `dist`
-3. Adicione a variável de ambiente `VITE_API_URL` (se houver backend).
+3. Adicione `VITE_API_URL` e `VITE_NEON_AUTH_URL`.
 4. Clique em **Create Web Service**.
 
 ---

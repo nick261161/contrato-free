@@ -1,22 +1,33 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input } from '../components/Input'
 import { useAuth } from '../context/AuthContext'
 
+type Modo = 'entrar' | 'criar'
+
 export function Login() {
-  const { user, login } = useAuth()
+  const { user, login, register } = useAuth()
   const navigate = useNavigate()
 
-  // useState: controla os campos do formulário e o estado de erro/envio
+  // useState: modo (entrar/criar conta) e campos do formulário
+  const [modo, setModo] = useState<Modo>('entrar')
+  const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
   if (user) return <Navigate to="/dashboard" replace />
+
+  const criando = modo === 'criar'
+
+  function trocarModo(novo: Modo) {
+    setModo(novo)
+    setErro(null)
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -27,9 +38,23 @@ export function Login() {
       return
     }
 
+    if (criando && nome.trim().length < 2) {
+      setErro('Informe seu nome completo.')
+      return
+    }
+
+    if (criando && senha.length < 8) {
+      setErro('A senha precisa ter no mínimo 8 caracteres.')
+      return
+    }
+
     setEnviando(true)
     try {
-      await login(email, senha)
+      if (criando) {
+        await register(nome.trim(), email, senha)
+      } else {
+        await login(email, senha)
+      }
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao entrar.')
@@ -44,11 +69,47 @@ export function Login() {
 
       <main className="auth">
         <div className="auth__card">
-          <span className="auth__tag">Acesso do freelancer</span>
-          <h1>Entrar na sua conta</h1>
-          <p>Use qualquer e-mail e uma senha com 4 ou mais caracteres.</p>
+          <span className="auth__tag">{criando ? 'Criar conta' : 'Acesso do freelancer'}</span>
+          <h1>{criando ? 'Crie sua conta' : 'Entrar na sua conta'}</h1>
+          <p>
+            {criando
+              ? 'Cadastro no Neon Auth: use um e-mail e uma senha com 8 ou mais caracteres.'
+              : 'Entre com o e-mail e a senha da sua conta.'}
+          </p>
+
+          <div className="auth__tabs" role="tablist" aria-label="Entrar ou criar conta">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!criando}
+              className={`auth__tab${criando ? '' : ' auth__tab--ativo'}`}
+              onClick={() => trocarModo('entrar')}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={criando}
+              className={`auth__tab${criando ? ' auth__tab--ativo' : ''}`}
+              onClick={() => trocarModo('criar')}
+            >
+              Criar conta
+            </button>
+          </div>
 
           <form className="auth__form" onSubmit={handleSubmit} noValidate>
+            {criando && (
+              <Input
+                label="Nome"
+                type="text"
+                name="nome"
+                placeholder="Seu nome completo"
+                value={nome}
+                onChange={(event) => setNome(event.target.value)}
+                required
+              />
+            )}
             <Input
               label="E-mail"
               type="email"
@@ -62,22 +123,43 @@ export function Login() {
               label="Senha"
               type="password"
               name="senha"
-              placeholder="••••••"
+              placeholder="••••••••"
               value={senha}
               onChange={(event) => setSenha(event.target.value)}
-              hint="Mínimo de 4 caracteres"
+              hint={criando ? 'Mínimo de 8 caracteres' : 'Use a senha da sua conta'}
               required
             />
 
             {erro && <p className="auth__error">{erro}</p>}
 
             <Button type="submit" fullWidth disabled={enviando}>
-              {enviando ? 'Entrando…' : 'Entrar'}
+              {enviando
+                ? criando
+                  ? 'Criando conta…'
+                  : 'Entrando…'
+                : criando
+                  ? 'Criar conta'
+                  : 'Entrar'}
             </Button>
           </form>
 
           <p className="auth__foot">
-            Ainda não tem conta? <Link to="/perfil">Complete seu perfil</Link> para começar.
+            {criando ? (
+              <>
+                Já tem conta?{' '}
+                <button type="button" className="auth__link" onClick={() => trocarModo('entrar')}>
+                  Entrar
+                </button>
+              </>
+            ) : (
+              <>
+                Ainda não tem conta?{' '}
+                <button type="button" className="auth__link" onClick={() => trocarModo('criar')}>
+                  Criar agora
+                </button>{' '}
+                — é grátis e leva menos de 1 minuto.
+              </>
+            )}
           </p>
         </div>
       </main>

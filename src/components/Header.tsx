@@ -54,7 +54,7 @@ export function Header() {
           {user ? (
             <>
               <span className="header__user">Olá, {user.nome}</span>
-              <Button variant="ghost" onClick={logout}>
+              <Button variant="ghost" onClick={() => void logout()}>
                 Sair
               </Button>
             </>

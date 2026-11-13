@@ -1,5 +1,5 @@
 /**
- * Camada de integração com o backend (ponto extra).
+ * Camada de integração com o backend.
  *
  * Como funciona:
  * - Se a variável de ambiente VITE_API_URL estiver definida (ex.: http://localhost:3001),
@@ -8,9 +8,10 @@
  *   contratos, clientes e perfil são persistidos no localStorage (sobrevivem ao F5)
  *   e as funções retornam Promises com latência simulada.
  *
- * Para conectar ao seu backend Node.js basta criar um arquivo .env na raiz com:
- *   VITE_API_URL=http://localhost:3001
- * e implementar os endpoints REST listados no README.
+ * Neste projeto a API real é o Express em `server/`, ligado ao PostgreSQL do Neon
+ * (DATABASE_URL do `.env.local`, gerado pelo `neon deploy`). Para usá-la:
+ *   npm run dev   (sobe API em :3001 + Vite em :5173)
+ * O contrato REST implementado pelo servidor está listado no README.
  */
 import type {
   Client,
