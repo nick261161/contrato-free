@@ -33,9 +33,10 @@ métricas no dashboard e **baixar o PDF assinado** (ou imprimir).
 - 💾 **Persistência real no Neon (PostgreSQL)** — a API em `server/` grava contratos,
   clientes e perfil no PostgreSQL do Neon (branch `production`); os clientes são
   reutilizáveis no wizard por um seletor;
-- 🔐 **Login real com Neon Auth** — cadastro e entrada com e-mail/senha (mínimo de 8
-  caracteres) gerenciados pelo **Neon Auth (Managed Better Auth)**, na mesma branch
-  do banco: a sessão sobrevive ao F5 e as rotas internas ficam protegidas.
+- 🔐 **Login real com Neon Auth** — cadastro, entrada e **recuperação de senha por
+  link no e-mail** com mínimo de 8 caracteres, gerenciados pelo **Neon Auth (Managed
+  Better Auth)**, na mesma branch do banco: a sessão sobrevive ao F5 e as rotas
+  internas ficam protegidas.
 
 > ℹ️ **Modo mock (fallback):** sem `VITE_API_URL`, os dados ficam no `localStorage`
 > do navegador e o link de assinatura abre **no mesmo navegador/computador**. Com a
@@ -117,9 +118,11 @@ src/
 │   ├── useContracts.ts    # Custom hook de contratos (CRUD + assinar)
 │   ├── useClients.ts      # Custom hook da agenda de clientes (CRUD)
 │   └── useLocalStorage.ts # Custom hook de persistência (modo mock)
-├── pages/                 # 7 páginas / rotas
+├── pages/                 # 9 páginas / rotas
 │   ├── Home.tsx           # /                    → Landing page
 │   ├── Login.tsx          # /login               → Entrar / Criar conta (Neon Auth)
+│   ├── EsqueciSenha.tsx   # /esqueci-senha       → Pede o link de redefinição (Neon Auth)
+│   ├── RedefinirSenha.tsx # /reset-password      → Troca a senha com o token do e-mail
 │   ├── Dashboard.tsx      # /dashboard           → Contratos + métricas + editar/excluir/assinar
 │   ├── NovoContrato.tsx   # /novo-contrato       → Wizard de geração
 │   │                      # /novo-contrato/:id   → Edição de contrato
@@ -327,9 +330,9 @@ git push -u origin main
 - [x] React.js + TypeScript inicializado via **Vite**
 - [x] **12 arquivos de componentes funcionais** em `src/components/` (14 componentes:
       `Input`, `Textarea` e `Select` contam como 3 — mínimo exigido: 8)
-- [x] **7 páginas** com React Router: `/`, `/login`, `/dashboard`, `/novo-contrato`
-      (e `/novo-contrato/:id` para edição), `/clientes`, `/perfil` e a página pública
-      `/assinar/:id` (mínimo exigido: 5)
+- [x] **9 páginas** com React Router: `/`, `/login`, `/esqueci-senha`,
+      `/reset-password`, `/dashboard`, `/novo-contrato` (e `/novo-contrato/:id` para
+      edição), `/clientes`, `/perfil` e a página pública `/assinar/:id` (mínimo exigido: 5)
 - [x] **7 hooks diferentes**: `useState`, `useEffect`, `useContext`, `useRef`
       + custom hooks `useContracts`, `useClients` e `useLocalStorage` (mínimo exigido: 4)
 - [x] CRUD completo: editar/excluir contratos e cadastrar/editar/excluir clientes

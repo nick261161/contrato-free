@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
@@ -129,6 +129,14 @@ export function Login() {
               hint={criando ? 'Mínimo de 8 caracteres' : 'Use a senha da sua conta'}
               required
             />
+
+            {!criando && (
+              <p className="auth__forgot">
+                <Link to="/esqueci-senha" className="auth__link">
+                  Esqueci minha senha
+                </Link>
+              </p>
+            )}
 
             {erro && <p className="auth__error">{erro}</p>}
 

@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { AuthUser } from '../types'
-import { authClient, type UsuarioAuth } from '../services/auth'
+import { authClient, mensagemDeErro, type UsuarioAuth } from '../services/auth'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -32,26 +32,6 @@ function paraUsuario(usuario: UsuarioAuth): AuthUser {
 function extrairUsuario(data: unknown): UsuarioAuth | null {
   const usuario = (data as { user?: UsuarioAuth | null } | null)?.user
   return usuario && usuario.email ? usuario : null
-}
-
-/** Traduz os erros comuns do Better Auth para PT-BR (mensagem específica). */
-function mensagemDeErro(error: { message?: string; code?: string } | null | undefined): string {
-  const texto = (error?.message ?? '').toLowerCase()
-
-  if (texto.includes('invalid email or password') || texto.includes('invalid credential')) {
-    return 'E-mail ou senha incorretos.'
-  }
-  if (texto.includes('user already exists') || texto.includes('already registered')) {
-    return 'Já existe uma conta com este e-mail.'
-  }
-  if (texto.includes('password') && (texto.includes('at least') || texto.includes('minimum'))) {
-    return 'A senha precisa ter no mínimo 8 caracteres.'
-  }
-  if (texto.includes('rate limit') || texto.includes('too many')) {
-    return 'Muitas tentativas. Aguarde alguns segundos e tente novamente.'
-  }
-
-  return error?.message || 'Falha na autenticação. Tente novamente.'
 }
 
 /** Monta um Error com a mensagem traduzida (retorno { error } ou exceção HTTP). */

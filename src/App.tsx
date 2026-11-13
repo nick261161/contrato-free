@@ -8,6 +8,8 @@ import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { NovoContrato } from './pages/NovoContrato'
 import { Perfil } from './pages/Perfil'
+import { EsqueciSenha } from './pages/EsqueciSenha'
+import { RedefinirSenha } from './pages/RedefinirSenha'
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
 
         {/* 2. Autenticação do freelancer */}
         <Route path="/login" element={<Login />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+        <Route path="/reset-password" element={<RedefinirSenha />} />
 
         {/* Página PÚBLICA: cliente recebe o link e assina sem login */}
         <Route path="/assinar/:id" element={<Assinar />} />
