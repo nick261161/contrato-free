@@ -1,4 +1,6 @@
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
+import { requerUsuario } from '../auth.js'
 import {
   mapContract,
   query,
@@ -38,42 +40,71 @@ function parseContrato(body) {
   }
 }
 
-/** GET /contracts — lista (mais recentes primeiro). */
+/** GET /contracts — lista da CONTA logada (mais recentes primeiro). */
 contractsRouter.get(
   '/',
+  requerUsuario,
   wrap(async (req, res) => {
     const { rows } = await query(
-      'SELECT * FROM contracts ORDER BY criado_em DESC, id DESC',
+      'SELECT * FROM contracts WHERE user_id = $1 ORDER BY criado_em DESC, id DESC',
+      [req.usuarioId],
     )
     res.json(rows.map(mapContract))
   }),
 )
 
-/** GET /contracts/:id — busca 1 contrato (usado pela página pública de assinatura). */
+/**
+ * GET /contracts/:id — busca 1 contrato. É a base do link PÚBLICO de
+ * assinatura (funciona sem login), então devolve junto o perfil do dono
+ * (nome/profissao/contato/termos): o signatário precisa ver quem preparou
+ * o documento e os termos que está assinando.
+ */
 contractsRouter.get(
   '/:id',
   wrap(async (req, res) => {
-    const { rows } = await query('SELECT * FROM contracts WHERE id = $1', [
-      req.params.id,
-    ])
+    const { rows } = await query(
+      `SELECT c.*, p.nome AS prestador_nome, p.email AS prestador_email,
+              p.telefone AS prestador_telefone, p.profissao AS prestador_profissao,
+              p.pix AS prestador_pix, p.termos_padrao AS prestador_termos
+         FROM contracts c
+         LEFT JOIN profiles p ON p.user_id = c.user_id
+        WHERE c.id = $1`,
+      [req.params.id],
+    )
     if (!rows[0]) throw httpError(404, 'Contrato não encontrado.')
-    res.json(mapContract(rows[0]))
+
+    const row = rows[0]
+    const contrato = mapContract(row)
+    if (row.prestador_nome != null) {
+      contrato.prestador = {
+        nome: row.prestador_nome,
+        email: row.prestador_email,
+        telefone: row.prestador_telefone,
+        profissao: row.prestador_profissao,
+        pix: row.prestador_pix,
+        termosPadrao: row.prestador_termos,
+      }
+    }
+    res.json(contrato)
   }),
 )
 
-/** POST /contracts — cria e sincroniza a agenda de clientes (transação). */
+/** POST /contracts — cria para a CONTA logada e sincroniza a agenda (transação). */
 contractsRouter.post(
   '/',
+  requerUsuario,
   wrap(async (req, res) => {
     const dados = parseContrato(req.body)
-    const id = `ctr-${Date.now()}`
+    // id com aleatoriedade: o GET /:id é público (link de assinatura),
+    // então o id precisa ser incapaz de ser adivinhado.
+    const id = `ctr-${Date.now()}-${randomBytes(4).toString('hex')}`
 
     const row = await withTransaction(async (tx) => {
       const { rows } = await tx.query(
         `INSERT INTO contracts
            (id, titulo, cliente, valor, data_inicio, prazo_dias, descricao, status,
-            assinatura_prestador, assinatura_contratante)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            assinatura_prestador, assinatura_contratante, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           id,
@@ -86,9 +117,14 @@ contractsRouter.post(
           dados.status,
           dados.assinaturaPrestador,
           dados.assinaturaContratante,
+          req.usuarioId,
         ],
       )
-      await upsertCliente(dados.cliente, (text, params) => tx.query(text, params))
+      await upsertCliente(
+        dados.cliente,
+        (text, params) => tx.query(text, params),
+        req.usuarioId,
+      )
       return rows[0]
     })
 
@@ -96,9 +132,10 @@ contractsRouter.post(
   }),
 )
 
-/** PUT /contracts/:id — edição completa (preserva as assinaturas enviadas). */
+/** PUT /contracts/:id — edição completa, apenas da CONTA dona do contrato. */
 contractsRouter.put(
   '/:id',
+  requerUsuario,
   wrap(async (req, res) => {
     const dados = parseContrato(req.body)
 
@@ -108,7 +145,7 @@ contractsRouter.put(
             SET titulo = $1, cliente = $2, valor = $3, data_inicio = $4,
                 prazo_dias = $5, descricao = $6, status = $7,
                 assinatura_prestador = $8, assinatura_contratante = $9
-          WHERE id = $10
+          WHERE id = $10 AND user_id = $11
           RETURNING *`,
         [
           dados.titulo,
@@ -121,10 +158,15 @@ contractsRouter.put(
           dados.assinaturaPrestador,
           dados.assinaturaContratante,
           req.params.id,
+          req.usuarioId,
         ],
       )
       if (!rows[0]) throw httpError(404, 'Contrato não encontrado.')
-      await upsertCliente(dados.cliente, (text, params) => tx.query(text, params))
+      await upsertCliente(
+        dados.cliente,
+        (text, params) => tx.query(text, params),
+        req.usuarioId,
+      )
       return rows[0]
     })
 
@@ -132,13 +174,14 @@ contractsRouter.put(
   }),
 )
 
-/** DELETE /contracts/:id — remove (sempre responde JSON). */
+/** DELETE /contracts/:id — remove apenas da CONTA dona (sempre responde JSON). */
 contractsRouter.delete(
   '/:id',
+  requerUsuario,
   wrap(async (req, res) => {
     const { rows } = await query(
-      'DELETE FROM contracts WHERE id = $1 RETURNING id',
-      [req.params.id],
+      'DELETE FROM contracts WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.usuarioId],
     )
     if (!rows[0]) throw httpError(404, 'Contrato não encontrado.')
     res.json({ ok: true })

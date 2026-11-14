@@ -30,3 +30,9 @@ server/.env
 *.sln
 *.sw?
 .neon
+
+# Vercel (vínculo do projeto)
+.vercel
+
+.vercel
+.env*

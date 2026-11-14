@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export function Footer() {
   return (
     <footer className="footer">
@@ -15,16 +17,17 @@ export function Footer() {
 
         <div className="footer__col">
           <h4>Produto</h4>
-          <a href="#funcionalidades">Funcionalidades</a>
-          <a href="#como-funciona">Como funciona</a>
-          <a href="#precos">Preços</a>
+          {/* Levam à Home e rolam até a seção (# no react-router) */}
+          <Link to="/#funcionalidades">Funcionalidades</Link>
+          <Link to="/#como-funciona">Como funciona</Link>
+          <Link to="/#precos">Preços</Link>
         </div>
 
         <div className="footer__col">
           <h4>Links</h4>
-          <a href="#termos">Termos de uso</a>
-          <a href="#privacidade">Privacidade</a>
-          <a href="#contato">Contato</a>
+          <Link to="/termos">Termos de uso</Link>
+          <Link to="/privacidade">Privacidade</Link>
+          <a href="mailto:contato@contratofree.com.br">Contato</a>
         </div>
       </div>
 

@@ -6,7 +6,15 @@ import {
   type ReactNode,
 } from 'react'
 import type { AuthUser } from '../types'
-import { authClient, mensagemDeErro, type UsuarioAuth } from '../services/auth'
+import {
+  authClient,
+  EVENTO_SESSAO_EXPIRADA,
+  mensagemDeErro,
+  type UsuarioAuth,
+} from '../services/auth'
+
+/** Flag lida pela tela de login para avisar "sua sessão expirou". */
+export const FLAG_SESSAO_EXPIRADA = 'contratofree.sessao-expirada'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -66,6 +74,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelado = true
     }
   }, [])
+
+  // Sessão rejeitada pela API (401): encerra a sessão na UI.
+  // O ProtectedRoute leva para /login e a tela exibe o aviso (flag).
+  // Só age quando havia usuário logado — chamada de página pública
+  // (ex.: /assinar sem sessão) não pode gerar aviso espúrio.
+  useEffect(() => {
+    function sessaoExpirada() {
+      if (!user) return
+      setUser(null)
+      try {
+        sessionStorage.setItem(FLAG_SESSAO_EXPIRADA, '1')
+      } catch {
+        // armazenamento indisponível: segue sem aviso
+      }
+    }
+    window.addEventListener(EVENTO_SESSAO_EXPIRADA, sessaoExpirada)
+    return () => window.removeEventListener(EVENTO_SESSAO_EXPIRADA, sessaoExpirada)
+  }, [user])
 
   /** Sign in (Neon Auth → Better Auth). Lança Error com mensagem em PT-BR. */
   async function login(email: string, senha: string): Promise<void> {

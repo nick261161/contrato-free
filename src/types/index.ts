@@ -39,6 +39,12 @@ export interface Contract {
   assinaturaPrestador?: Signature
   /** Assinatura do contratante (cliente) — registrada pelo link público. */
   assinaturaContratante?: Signature
+  /**
+   * Perfil público do prestador (dono do contrato) — embutido na busca
+   * pública por id para a página de assinatura (/assinar/:id) mostrar
+   * quem preparou e os termos sem exigir login.
+   */
+  prestador?: FreelancerProfile
 }
 
 export interface FreelancerProfile {

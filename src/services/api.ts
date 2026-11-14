@@ -21,6 +21,7 @@ import type {
   SignRole,
   Signature,
 } from '../types'
+import { authClient, EVENTO_SESSAO_EXPIRADA } from './auth'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const MOCK_DELAY_MS = 600
@@ -34,13 +35,40 @@ const PROFILE_KEY = 'contratofree.mock.profile'
 
 /** Helper genérico para chamadas REST reais. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  // Envia o token da sessão do Neon Auth: a API valida ele e usa o
+  // usuário para isolar contratos/clientes/perfil por conta.
+  try {
+    const sessao = await authClient.getSession()
+    const token = (
+      sessao?.data as { session?: { token?: string } } | null | undefined
+    )?.session?.token
+    if (token) headers.Authorization = `Bearer ${token}`
+  } catch {
+    // sem sessão ativa: rotas públicas (ex.: página de assinatura) seguem sem token
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   })
 
   if (!response.ok) {
-    throw new Error(`Erro ${response.status}: ${response.statusText}`)
+    // 401 da API = a sessão não vale mais (expirada, revogada ou o SDK
+    // nem token devolveu): avisa o app. O AuthContext só age se havia
+    // usuário logado — visitante de página pública é ignorado lá.
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent(EVENTO_SESSAO_EXPIRADA))
+    }
+    let detalhe = response.statusText || `HTTP ${response.status}`
+    try {
+      const corpo = (await response.json()) as { erro?: string }
+      if (corpo?.erro) detalhe = corpo.erro
+    } catch {
+      // resposta sem corpo JSON: mantém o statusText
+    }
+    throw new Error(`Erro ${response.status}: ${detalhe}`)
   }
 
   return (await response.json()) as T

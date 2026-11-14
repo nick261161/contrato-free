@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 
@@ -34,6 +34,7 @@ const steps = [
 
 export function Home() {
   const [highlight, setHighlight] = useState(0)
+  const { hash } = useLocation()
 
   // useEffect: alterna o destaque do hero para criar um pequeno carrossel
   useEffect(() => {
@@ -42,6 +43,13 @@ export function Home() {
     }, 2500)
     return () => clearInterval(timer)
   }, [])
+
+  // Links do rodapé chegam como /#seccion — rola suave até o alvo.
+  useEffect(() => {
+    if (!hash) return
+    const alvo = document.getElementById(hash.slice(1))
+    alvo?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [hash])
 
   return (
     <div className="page">

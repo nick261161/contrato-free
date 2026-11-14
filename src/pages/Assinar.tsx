@@ -6,7 +6,7 @@ import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { SignaturePad } from '../components/SignaturePad'
 import { STATUS_LABEL, type Contract, type FreelancerProfile } from '../types'
-import { getContract, getProfile, signContract } from '../services/api'
+import { getContract, signContract } from '../services/api'
 import { downloadContractPdf } from '../services/pdf'
 
 /**
@@ -37,11 +37,13 @@ export function Assinar() {
     }
 
     let ativo = true
-    Promise.all([getContract(id), getProfile()])
-      .then(([contrato, perfil]) => {
+    // Só o contrato é obrigatório: ele já vem com o perfil do prestador
+    // embutido (rota pública), então a página funciona sem login.
+    getContract(id)
+      .then((contrato) => {
         if (!ativo) return
         setContract(contrato)
-        setProfile(perfil)
+        setProfile(contrato.prestador ?? null)
         setAssinante(contrato.cliente.nome)
       })
       .catch(() => {

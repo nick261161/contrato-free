@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input } from '../components/Input'
-import { useAuth } from '../context/AuthContext'
+import { FLAG_SESSAO_EXPIRADA, useAuth } from '../context/AuthContext'
 
 type Modo = 'entrar' | 'criar'
 
@@ -19,6 +19,20 @@ export function Login() {
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [avisoSessao, setAvisoSessao] = useState(false)
+
+  // Aviso de sessão expirada (flag gravada pelo AuthContext no 401).
+  // Fica antes do return condicional para respeitar as regras de hooks.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(FLAG_SESSAO_EXPIRADA)) {
+        sessionStorage.removeItem(FLAG_SESSAO_EXPIRADA)
+        setAvisoSessao(true)
+      }
+    } catch {
+      // armazenamento indisponível: segue sem aviso
+    }
+  }, [])
 
   if (user) return <Navigate to="/dashboard" replace />
 
@@ -76,6 +90,12 @@ export function Login() {
               ? 'Cadastro no Neon Auth: use um e-mail e uma senha com 8 ou mais caracteres.'
               : 'Entre com o e-mail e a senha da sua conta.'}
           </p>
+
+          {avisoSessao && (
+            <p className="auth__notice" role="status">
+              Sua sessão expirou. Entre novamente para continuar de onde parou.
+            </p>
+          )}
 
           <div className="auth__tabs" role="tablist" aria-label="Entrar ou criar conta">
             <button

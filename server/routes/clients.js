@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { requerUsuario } from '../auth.js'
 import { mapClient, query, upsertCliente } from '../db.js'
 import { httpError, wrap } from '../http.js'
 
@@ -18,50 +19,63 @@ function parseCliente(body) {
   }
 }
 
-/** GET /clients — agenda completa (mais recentes primeiro). */
+/** GET /clients — agenda da CONTA logada (mais recentes primeiro). */
 clientsRouter.get(
   '/',
+  requerUsuario,
   wrap(async (req, res) => {
     const { rows } = await query(
-      'SELECT * FROM clients ORDER BY criado_em DESC, id DESC',
+      'SELECT * FROM clients WHERE user_id = $1 ORDER BY criado_em DESC, id DESC',
+      [req.usuarioId],
     )
     res.json(rows.map(mapClient))
   }),
 )
 
-/** POST /clients — salva; se o e-mail já existir, atualiza (upsert). */
+/** POST /clients — salva na CONTA logada; e-mail repetido nela atualiza (upsert). */
 clientsRouter.post(
   '/',
+  requerUsuario,
   wrap(async (req, res) => {
-    const row = await upsertCliente(parseCliente(req.body))
+    const row = await upsertCliente(parseCliente(req.body), query, req.usuarioId)
     res.status(201).json(mapClient(row))
   }),
 )
 
-/** PUT /clients/:id — atualiza um cliente da agenda. */
+/** PUT /clients/:id — atualiza um cliente da agenda da CONTA dona. */
 clientsRouter.put(
   '/:id',
+  requerUsuario,
   wrap(async (req, res) => {
     const dados = parseCliente(req.body)
     const { rows } = await query(
       `UPDATE clients
           SET nome = $1, email = $2, cpf_cnpj = $3, endereco = $4
-        WHERE id = $5
+        WHERE id = $5 AND user_id = $6
         RETURNING *`,
-      [dados.nome, dados.email, dados.cpfCnpj, dados.endereco, req.params.id],
+      [
+        dados.nome,
+        dados.email,
+        dados.cpfCnpj,
+        dados.endereco,
+        req.params.id,
+        req.usuarioId,
+      ],
     )
     if (!rows[0]) throw httpError(404, 'Cliente não encontrado.')
     res.json(mapClient(rows[0]))
   }),
 )
 
-/** DELETE /clients/:id — remove da agenda. */
+/** DELETE /clients/:id — remove da agenda da CONTA dona. */
 clientsRouter.delete(
   '/:id',
+  requerUsuario,
   wrap(async (req, res) => {
-    const { rows } = await query('DELETE FROM clients WHERE id = $1 RETURNING id', [
-      req.params.id,
-    ])
+    const { rows } = await query(
+      'DELETE FROM clients WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.usuarioId],
+    )
     if (!rows[0]) throw httpError(404, 'Cliente não encontrado.')
     res.json({ ok: true })
   }),

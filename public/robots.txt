@@ -1,0 +1,12 @@
+# ContratoFree — robots
+# Os links de assinatura (/assinar/:id) são privados (capability link):
+# não devem ser rastreados nem indexados.
+User-agent: *
+Allow: /
+Disallow: /assinar/
+Disallow: /dashboard
+Disallow: /novo-contrato
+Disallow: /clientes
+Disallow: /perfil
+Disallow: /esqueci-senha
+Disallow: /reset-password

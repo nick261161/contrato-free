@@ -20,6 +20,13 @@ export const authClient = createAuthClient(baseUrl, {
   adapter: BetterAuthReactAdapter(),
 })
 
+/**
+ * Evento disparado (via `window`) quando a API responde 401 para uma
+ * requisição que LEVOU token: a sessão era válida e foi rejeitada
+ * (expirada ou revogada). O AuthContext escuta e encerra a sessão na UI.
+ */
+export const EVENTO_SESSAO_EXPIRADA = 'contratofree:sessao-expirada'
+
 /** Usuário no formato devolvido pelo Better Auth (name/email). */
 export interface UsuarioAuth {
   name?: string | null

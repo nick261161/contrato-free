@@ -1,0 +1,12 @@
+# Segredos e vínculos locais — nunca subir para a Vercel
+.env
+.env.*
+*.local
+.neon
+.vercel
+server/.env
+
+# Artefatos locais
+dist
+logs
+*.log

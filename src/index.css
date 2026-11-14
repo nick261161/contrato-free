@@ -1847,3 +1847,90 @@ select.field__control {
     padding: 0;
   }
 }
+
+/* ---------------- Aviso de sessão expirada (login) ---------------- */
+.auth__notice {
+  background: #fffbeb;
+  color: var(--warning);
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ---------------- Página404 / erro de renderização ---------------- */
+.notfound {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 5rem 1rem;
+}
+
+.notfound__code {
+  font-size: clamp(3rem, 9vw, 5rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--primary);
+  letter-spacing: -0.03em;
+}
+
+.notfound p {
+  max-width: 34rem;
+  color: var(--text-soft);
+}
+
+.notfound__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.6rem;
+}
+
+.notfound__detalhe {
+  margin-top: 1rem;
+  color: var(--text-soft);
+  opacity: 0.75;
+  font-size: 0.78rem;
+}
+
+/* ---------------- Páginas legais (termos / privacidade) ---------------- */
+.legal {
+  flex: 1;
+  padding: 3.5rem 0 4.5rem;
+  max-width: 46rem;
+}
+
+.legal h1 {
+  margin-bottom: 0.1em;
+}
+
+.legal__meta {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+.legal section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 0.9rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.legal h2 {
+  font-size: 1.02rem;
+  margin-bottom: 0.35em;
+}
+
+.legal p {
+  color: var(--text-soft);
+  font-size: 0.93rem;
+}

@@ -14,6 +14,16 @@ const W = 210
 const RIGHT = W - M
 const CW = RIGHT - M // largura útil
 
+/** Perfil vazio de fallback para quando não há dados do prestador. */
+const PERFIL_VAZIO: FreelancerProfile = {
+  nome: '',
+  email: '',
+  telefone: '',
+  profissao: '',
+  pix: '',
+  termosPadrao: '',
+}
+
 const INDIGO: [number, number, number] = [79, 70, 229]
 const DARK: [number, number, number] = [28, 32, 51]
 const SOFT: [number, number, number] = [92, 97, 120]
@@ -325,7 +335,11 @@ export async function buildContractPdf(
 
 /** Gera e baixa o PDF do contrato (com assinatura, quando houver). */
 export async function downloadContractPdf(contract: Contract): Promise<void> {
-  const profile = await getProfile()
+  // Contrato vindo da busca pública por id já traz o perfil do prestador
+  // embutido (página de assinatura, sem login); nos fluxos logados, busca
+  // o perfil da conta atual. Sem perfil disponível, o PDF usa campos vazios.
+  const profile =
+    contract.prestador ?? (await getProfile().catch(() => PERFIL_VAZIO))
   const doc = await buildContractPdf(contract, profile)
 
   const slug = (contract.titulo || 'contrato')

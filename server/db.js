@@ -6,7 +6,6 @@
  * - DATABASE_URL_UNPOOLED  → criação de schema e seed (conexão direta,
  *   pois operações de DDL não devem passar pelo PgBouncer).
  */
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
@@ -60,6 +59,8 @@ export async function withTransaction(fn) {
 // ---------------------------------------------------------------------------
 
 export async function ensureSchema() {
+  // Idempotente: roda a cada cold start (Vercel) e no `npm run dev` local.
+  // Cada conta tem seu próprio user_id — listas e escritas são filtradas por ele.
   await poolDireto.query(`
     CREATE TABLE IF NOT EXISTS contracts (
       id TEXT PRIMARY KEY,
@@ -73,8 +74,12 @@ export async function ensureSchema() {
         CHECK (status IN ('rascunho', 'pendente', 'assinado', 'concluido')),
       criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
       assinatura_prestador JSONB,
-      assinatura_contratante JSONB
+      assinatura_contratante JSONB,
+      user_id TEXT
     );
+
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS user_id TEXT;
+    CREATE INDEX IF NOT EXISTS contracts_usuario_idx ON contracts (user_id);
 
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
@@ -82,14 +87,18 @@ export async function ensureSchema() {
       email TEXT NOT NULL,
       cpf_cnpj TEXT NOT NULL DEFAULT '',
       endereco TEXT NOT NULL DEFAULT '',
-      criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+      user_id TEXT
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS clients_email_unico
-      ON clients (lower(btrim(email)));
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS user_id TEXT;
+    -- e-mail único POR CONTA (o índice global antigo foi removido na migração)
+    DROP INDEX IF EXISTS clients_email_unico;
+    CREATE UNIQUE INDEX IF NOT EXISTS clients_email_usuario_unico
+      ON clients (user_id, lower(btrim(email)));
 
     CREATE TABLE IF NOT EXISTS profiles (
-      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      user_id TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
       email TEXT NOT NULL DEFAULT '',
       telefone TEXT NOT NULL DEFAULT '',
@@ -98,66 +107,6 @@ export async function ensureSchema() {
       termos_padrao TEXT NOT NULL DEFAULT ''
     );
   `)
-}
-
-/** Insere os dados de exemplo na primeira execução (banco vazio). */
-export async function seedIfEmpty() {
-  const seedPath = path.join(here, 'seed.json')
-  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'))
-
-  const { rows } = await poolDireto.query('SELECT count(*)::int AS total FROM contracts')
-  if (rows[0].total === 0) {
-    for (const c of seed.contracts) {
-      await poolDireto.query(
-        `INSERT INTO contracts
-           (id, titulo, cliente, valor, data_inicio, prazo_dias, descricao, status,
-            criado_em, assinatura_prestador, assinatura_contratante)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         ON CONFLICT (id) DO NOTHING`,
-        [
-          c.id,
-          c.titulo,
-          c.cliente,
-          c.valor,
-          c.dataInicio,
-          c.prazoDias,
-          c.descricao,
-          c.status,
-          c.criadoEm,
-          c.assinaturaPrestador ?? null,
-          c.assinaturaContratante ?? null,
-        ],
-      )
-    }
-    console.log(`🌱 Seed: ${seed.contracts.length} contratos de exemplo inseridos.`)
-  }
-
-  const clientes = await poolDireto.query('SELECT count(*)::int AS total FROM clients')
-  if (clientes.rows[0].total === 0) {
-    for (const cli of seed.clients) {
-      await poolDireto.query(
-        `INSERT INTO clients (id, nome, email, cpf_cnpj, endereco, criado_em)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO NOTHING`,
-        [cli.id, cli.nome, cli.email, cli.cpfCnpj, cli.endereco, cli.criadoEm],
-      )
-    }
-    console.log(`🌱 Seed: ${seed.clients.length} clientes de exemplo inseridos.`)
-  }
-
-  await poolDireto.query(
-    `INSERT INTO profiles (id, nome, email, telefone, profissao, pix, termos_padrao)
-     VALUES (1, $1, $2, $3, $4, $5, $6)
-     ON CONFLICT (id) DO NOTHING`,
-    [
-      seed.profile.nome,
-      seed.profile.email,
-      seed.profile.telefone,
-      seed.profile.profissao,
-      seed.profile.pix,
-      seed.profile.termosPadrao,
-    ],
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -207,33 +156,48 @@ export function mapProfile(row) {
 // ---------------------------------------------------------------------------
 
 /**
- * Upsert de cliente por e-mail (mesma regra do modo mock: se o e-mail já
- * existir — comparação sem caixa/espaços — atualiza o registro).
+ * Upsert de cliente POR CONTA (mesma regra do modo mock: se o e-mail já
+ * existir para este usuário — comparação sem caixa/espaços — atualiza o
+ * registro; contas diferentes podem ter o mesmo e-mail de cliente).
  * Aceita um executor próprio para rodar dentro de transação.
  */
-export async function upsertCliente(cliente, executor = query) {
+export async function upsertCliente(cliente, executor = query, usuarioId) {
   const email = cliente.email.trim().toLowerCase()
   const existente = await executor(
-    'SELECT * FROM clients WHERE lower(btrim(email)) = $1',
-    [email],
+    'SELECT * FROM clients WHERE user_id = $1 AND lower(btrim(email)) = $2',
+    [usuarioId, email],
   )
 
   if (existente.rowCount > 0) {
     const { rows } = await executor(
       `UPDATE clients
           SET nome = $1, email = $2, cpf_cnpj = $3, endereco = $4
-        WHERE id = $5
+        WHERE id = $5 AND user_id = $6
         RETURNING *`,
-      [cliente.nome, cliente.email, cliente.cpfCnpj, cliente.endereco, existente.rows[0].id],
+      [
+        cliente.nome,
+        cliente.email,
+        cliente.cpfCnpj,
+        cliente.endereco,
+        existente.rows[0].id,
+        usuarioId,
+      ],
     )
     return rows[0]
   }
 
   const { rows } = await executor(
-    `INSERT INTO clients (id, nome, email, cpf_cnpj, endereco)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO clients (id, nome, email, cpf_cnpj, endereco, user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [`cli-${Date.now()}`, cliente.nome, cliente.email, cliente.cpfCnpj, cliente.endereco],
+    [
+      `cli-${Date.now()}`,
+      cliente.nome,
+      cliente.email,
+      cliente.cpfCnpj,
+      cliente.endereco,
+      usuarioId,
+    ],
   )
   return rows[0]
 }
