@@ -16,6 +16,14 @@ export interface Signature {
   em: string
   /** Desenho da assinatura em dataURL (opcional). */
   imagem?: string
+  /**
+   * SHA-256 (hex) do conteúdo do contrato no momento da assinatura —
+   * gerado pelo servidor para comprovar integridade; no modo mock, gerado
+   * localmente com Web Crypto (ver services/canonico.ts).
+   */
+  hash?: string
+  /** Endereço IP de quem assinou (registrado pelo servidor). */
+  ip?: string
 }
 
 /**
@@ -45,6 +53,25 @@ export interface Contract {
    * quem preparou e os termos sem exigir login.
    */
   prestador?: FreelancerProfile
+  /**
+   * Nicho de atuação escolhido no wizard (design, dev, social, video,
+   * redacao) — define as cláusulas-base do contrato (services/clausulas.ts).
+   */
+  nicho?: string
+  /** Cláusulas opcionais ativas (liga/desliga) neste contrato. */
+  clausulas?: Clausulas
+}
+
+/** Cláusulas opcionais que o freelancer liga/desliga no wizard. */
+export interface Clausulas {
+  /** Multa por atraso no pagamento. */
+  multa: boolean
+  /** Confidencialidade (NDA). */
+  nda: boolean
+  /** Direito de uso do trabalho em portfólio. */
+  portfolio: boolean
+  /** Rescisão antecipada. */
+  rescisao: boolean
 }
 
 export interface FreelancerProfile {

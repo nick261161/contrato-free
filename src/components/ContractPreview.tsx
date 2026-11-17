@@ -1,5 +1,6 @@
 import type { Ref } from 'react'
 import type { Contract, FreelancerProfile, Signature } from '../types'
+import { CLAUSULAS_OPCIONAIS, NICHOS } from '../services/clausulas'
 
 interface ContractPreviewProps {
   contract: Contract
@@ -58,6 +59,16 @@ function SignatureSlot({ signature, nome, papel }: SignatureSlotProps) {
       ) : (
         <span className="preview__sig-hint">Aguardando assinatura</span>
       )}
+
+      {signature?.hash && (
+        <span
+          className="preview__sig-hash"
+          title={`SHA-256 do conteúdo: ${signature.hash}`}
+        >
+          SHA-256: {signature.hash.slice(0, 24)}…
+          {signature.ip ? ` · IP ${signature.ip}` : ''}
+        </span>
+      )}
     </div>
   )
 }
@@ -73,6 +84,27 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
         ).toISOString().slice(0, 10),
       )
     : '—'
+
+  // Seções dinâmicas: objeto + termos padrão sempre; nicho e cláusulas
+  // opcionais entram quando escolhidas — a numeração é recalculada.
+  const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
+  const opcionais = CLAUSULAS_OPCIONAIS.filter(
+    (item) => contract.clausulas?.[item.chave],
+  )
+
+  const secoes: Array<{ titulo: string; conteudo: string }> = [
+    { titulo: 'Objeto do contrato', conteudo: contract.descricao || '—' },
+    { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao || '—' },
+  ]
+  if (nichoDef) {
+    secoes.push({
+      titulo: `Cláusulas-base — ${nichoDef.label}`,
+      conteudo: nichoDef.clausulas.join(' '),
+    })
+  }
+  for (const item of opcionais) {
+    secoes.push({ titulo: item.titulo, conteudo: item.texto })
+  }
 
   return (
     <div className="preview" ref={innerRef} id="contract-print">
@@ -132,18 +164,17 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
         </div>
       </div>
 
-      <section className="preview__section">
-        <h3>1. Objeto do contrato</h3>
-        <p>{contract.descricao || '—'}</p>
-      </section>
+      {secoes.map((secao, index) => (
+        <section className="preview__section" key={secao.titulo}>
+          <h3>
+            {index + 1}. {secao.titulo}
+          </h3>
+          <p>{secao.conteudo}</p>
+        </section>
+      ))}
 
       <section className="preview__section">
-        <h3>2. Condições padrão do prestador</h3>
-        <p>{profile.termosPadrao || '—'}</p>
-      </section>
-
-      <section className="preview__section">
-        <h3>3. Assinaturas</h3>
+        <h3>{secoes.length + 1}. Assinaturas</h3>
 
         <div className="preview__signatures">
           <SignatureSlot

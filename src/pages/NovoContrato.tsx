@@ -16,21 +16,27 @@ import { ShareLink } from '../components/ShareLink'
 import { Sidebar } from '../components/Sidebar'
 import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
+import { useConsultaCnpjCep } from '../hooks/useConsultaCnpjCep'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { getContracts, getProfile } from '../services/api'
+import { apenasDigitos, formatarCEP } from '../services/brasil'
+import { CLAUSULAS_OPCIONAIS, NICHOS, nichoLabel } from '../services/clausulas'
 import { downloadContractPdf } from '../services/pdf'
-import type { Contract, FreelancerProfile } from '../types'
+import type { Clausulas, Contract, FreelancerProfile } from '../types'
 
 interface WizardState {
   titulo: string
   clienteNome: string
   clienteEmail: string
   clienteCpf: string
+  clienteCep: string
   clienteEndereco: string
   descricao: string
   valor: string
   dataInicio: string
   prazoDias: string
+  nicho: string
+  clausulas: Clausulas
 }
 
 const initialForm: WizardState = {
@@ -38,11 +44,14 @@ const initialForm: WizardState = {
   clienteNome: '',
   clienteEmail: '',
   clienteCpf: '',
+  clienteCep: '',
   clienteEndereco: '',
   descricao: '',
   valor: '',
   dataInicio: '',
   prazoDias: '30',
+  nicho: '',
+  clausulas: { multa: false, nda: false, portfolio: false, rescisao: false },
 }
 
 const steps = [
@@ -113,11 +122,20 @@ export function NovoContrato() {
           clienteNome: found.cliente.nome,
           clienteEmail: found.cliente.email,
           clienteCpf: found.cliente.cpfCnpj,
+          clienteCep: '',
           clienteEndereco: found.cliente.endereco,
           descricao: found.descricao,
           valor: String(found.valor),
           dataInicio: found.dataInicio,
           prazoDias: String(found.prazoDias),
+          nicho: found.nicho ?? '',
+          clausulas: {
+            multa: false,
+            nda: false,
+            portfolio: false,
+            rescisao: false,
+            ...found.clausulas,
+          },
         })
         setErrors({})
       })
@@ -156,6 +174,8 @@ export function NovoContrato() {
     criadoEm: editing?.criadoEm ?? new Date().toISOString(),
     assinaturaPrestador: editing?.assinaturaPrestador,
     assinaturaContratante: editing?.assinaturaContratante,
+    nicho: form.nicho,
+    clausulas: form.clausulas,
   }
 
   function update(field: keyof WizardState, value: string) {
@@ -163,6 +183,37 @@ export function NovoContrato() {
     setErrors((current) => ({ ...current, [field]: undefined }))
     // editar manualmente os dados do cliente "desvincula" o cliente salvo escolhido
     if (field.startsWith('cliente')) setClienteSalvoId('')
+  }
+
+  // CNPJ/CEP: preenchimento automático pela BrasilAPI — só mexe em campos
+  // vazios (via setForm funcional), então nunca sobrescreve o que o usuário
+  // digitou; o botão "Buscar endereço" substitui de propósito.
+  const consulta = useConsultaCnpjCep({
+    cpfCnpj: form.clienteCpf,
+    cep: form.clienteCep,
+    onEmpresa: (empresa) => {
+      setForm((current) => ({
+        ...current,
+        clienteNome: current.clienteNome.trim() || empresa.nome,
+        clienteEndereco: current.clienteEndereco.trim() || empresa.endereco,
+        clienteCep: current.clienteCep || formatarCEP(empresa.cep),
+      }))
+    },
+    onEndereco: (endereco, sobrescrever) => {
+      setForm((current) =>
+        sobrescrever || !current.clienteEndereco.trim()
+          ? { ...current, clienteEndereco: endereco }
+          : current,
+      )
+    },
+  })
+
+  /** Liga/desliga uma cláusula opcional do contrato. */
+  function toggleClausula(chave: keyof Clausulas) {
+    setForm((current) => ({
+      ...current,
+      clausulas: { ...current.clausulas, [chave]: !current.clausulas[chave] },
+    }))
   }
 
   /** Preenche os campos do cliente ao escolher um contato já salvo. */
@@ -252,6 +303,8 @@ export function NovoContrato() {
       prazoDias: Number(form.prazoDias),
       descricao: form.descricao.trim(),
       status: editing ? editing.status : 'pendente',
+      nicho: form.nicho,
+      clausulas: form.clausulas,
     }
 
     setSalvando(true)
@@ -292,6 +345,15 @@ export function NovoContrato() {
     { value: '', label: '— Preencher manualmente —' },
     ...clients.map((c) => ({ value: c.id, label: `${c.nome} (${c.email})` })),
   ]
+
+  // Resumo das cláusulas escolhidas para a etapa de revisão
+  const clausulasAtivas = CLAUSULAS_OPCIONAIS.filter(
+    (item) => form.clausulas[item.chave],
+  )
+  const resumoClausulas =
+    [nichoLabel(form.nicho), ...clausulasAtivas.map((item) => item.titulo)]
+      .filter(Boolean)
+      .join(' · ') || 'Padrão do contrato'
 
   return (
     <div className="page">
@@ -382,7 +444,42 @@ export function NovoContrato() {
                       placeholder="00.000.000/0000-00"
                       value={form.clienteCpf}
                       onChange={(event) => update('clienteCpf', event.target.value)}
+                      hint={
+                        consulta.dicaCnpj?.texto ??
+                        (apenasDigitos(form.clienteCpf).length === 11
+                          ? 'CPF não tem consulta pública — digite o CNPJ para preencher os dados automaticamente.'
+                          : undefined)
+                      }
                     />
+                  </div>
+                  <div className="field">
+                    <label className="field__label" htmlFor="clienteCep">
+                      CEP do cliente
+                    </label>
+                    <div className="lookup">
+                      <input
+                        id="clienteCep"
+                        className="field__control"
+                        placeholder="00000-000"
+                        inputMode="numeric"
+                        value={form.clienteCep}
+                        onChange={(event) => update('clienteCep', event.target.value)}
+                      />
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        disabled={consulta.buscandoCep}
+                        onClick={() => void consulta.consultarCepAgora(form.clienteCep)}
+                      >
+                        {consulta.buscandoCep ? 'Buscando…' : '🔍 Buscar endereço'}
+                      </Button>
+                    </div>
+                    {consulta.dicaCep &&
+                      (consulta.dicaCep.tipo === 'erro' ? (
+                        <span className="field__error">{consulta.dicaCep.texto}</span>
+                      ) : (
+                        <span className="field__hint">{consulta.dicaCep.texto}</span>
+                      ))}
                   </div>
                   <Input
                     label="Endereço do cliente"
@@ -390,13 +487,33 @@ export function NovoContrato() {
                     placeholder="Rua, número — cidade/UF"
                     value={form.clienteEndereco}
                     onChange={(event) => update('clienteEndereco', event.target.value)}
+                    hint="Preenchido sozinho pelo CNPJ ou pelo CEP (BrasilAPI)."
                   />
                 </section>
               )}
 
               {step === 2 && (
                 <section className="panel">
-                  <h2>Escopo e valores</h2>
+                  <h2>Escopo, valores e cláusulas</h2>
+
+                  <Select
+                    label="Sua área de atuação"
+                    name="nicho"
+                    options={[
+                      { value: '', label: '— Contrato genérico (sem nicho) —' },
+                      ...NICHOS.map((item) => ({ value: item.value, label: item.label })),
+                    ]}
+                    value={form.nicho}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, nicho: event.target.value }))
+                    }
+                    hint={
+                      nichoLabel(form.nicho)
+                        ? `✓ Cláusulas-base de ${nichoLabel(form.nicho)} já entram na prévia.`
+                        : 'Escolha sua área para carregar cláusulas-base específicas do seu ofício.'
+                    }
+                  />
+
                   <Textarea
                     label="Descrição do serviço"
                     name="descricao"
@@ -434,6 +551,29 @@ export function NovoContrato() {
                     onChange={(event) => update('dataInicio', event.target.value)}
                     error={errors.dataInicio}
                   />
+
+                  <div className="toggles">
+                    <span className="toggles__label">Cláusulas opcionais</span>
+                    {CLAUSULAS_OPCIONAIS.map((opcao) => (
+                      <label
+                        key={opcao.chave}
+                        className={`toggle ${form.clausulas[opcao.chave] ? 'is-on' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.clausulas[opcao.chave]}
+                          onChange={() => toggleClausula(opcao.chave)}
+                        />
+                        <span className="toggle__track" aria-hidden="true">
+                          <span className="toggle__thumb" />
+                        </span>
+                        <span className="toggle__text">
+                          <strong>{opcao.titulo}</strong>
+                          <small>{opcao.resumo}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </section>
               )}
 
@@ -457,6 +597,10 @@ export function NovoContrato() {
                       <span>Início</span>
                       <strong>{form.dataInicio || '—'}</strong>
                     </li>
+                    <li>
+                      <span>Cláusulas</span>
+                      <strong>{resumoClausulas}</strong>
+                    </li>
                   </ul>
 
                   <p className="panel__note">
@@ -472,6 +616,12 @@ export function NovoContrato() {
                         contrato aparecerá no dashboard.
                       </>
                     )}
+                  </p>
+
+                  <p className="disclaimer">
+                    ⚠️ Aviso legal: este modelo é educativo e informativo —{' '}
+                    <strong>não substitui a revisão de um advogado</strong> para casos
+                    complexos. Em caso de dúvida jurídica, consulte um profissional.
                   </p>
 
                   <div className="wizard__actions">
@@ -549,7 +699,15 @@ export function NovoContrato() {
           <strong>{sucesso?.cliente.nome}</strong>. Os dados do cliente ficaram salvos na
           sua agenda.
         </p>
-        {sucesso && <ShareLink contractId={sucesso.id} titulo={sucesso.titulo} />}
+        {sucesso && (
+          <ShareLink
+            contractId={sucesso.id}
+            titulo={sucesso.titulo}
+            valor={sucesso.valor}
+            prazoDias={sucesso.prazoDias}
+            cliente={sucesso.cliente.nome}
+          />
+        )}
       </Modal>
 
       <Footer />

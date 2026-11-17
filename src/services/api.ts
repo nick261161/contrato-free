@@ -22,6 +22,7 @@ import type {
   Signature,
 } from '../types'
 import { authClient, definirTokenSessao, EVENTO_SESSAO_EXPIRADA, tokenSessaoReserva } from './auth'
+import { contratoCanonico, sha256Hex } from './canonico'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const MOCK_DELAY_MS = 600
@@ -350,6 +351,11 @@ export async function signContract(
       em: new Date().toISOString(),
       imagem: signature.imagem,
     }
+
+    // Integridade: mesmo formato do hash oficial do servidor (o IP fica por
+    // conta do backend; no modo local não há como observá-lo).
+    const hash = await sha256Hex(contratoCanonico(atual))
+    if (hash) nova.hash = hash
 
     const updated: Contract =
       signature.quem === 'prestador'

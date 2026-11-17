@@ -81,6 +81,10 @@ export async function ensureSchema() {
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS user_id TEXT;
     CREATE INDEX IF NOT EXISTS contracts_usuario_idx ON contracts (user_id);
 
+    -- Nicho + cláusulas opcionais do wizard (aditivo, idempotente)
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS nicho TEXT NOT NULL DEFAULT '';
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS clausulas JSONB NOT NULL DEFAULT '{}';
+
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
@@ -126,6 +130,8 @@ export function mapContract(row) {
     criadoEm: new Date(row.criado_em).toISOString(),
     assinaturaPrestador: row.assinatura_prestador ?? undefined,
     assinaturaContratante: row.assinatura_contratante ?? undefined,
+    nicho: row.nicho ?? '',
+    clausulas: row.clausulas ?? {},
   }
 }
 

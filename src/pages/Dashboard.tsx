@@ -350,7 +350,13 @@ export function Dashboard() {
               </Button>
             </div>
 
-            <ShareLink contractId={selected.id} titulo={selected.titulo} />
+            <ShareLink
+              contractId={selected.id}
+              titulo={selected.titulo}
+              valor={selected.valor}
+              prazoDias={selected.prazoDias}
+              cliente={selected.cliente.nome}
+            />
           </div>
         )}
       </Modal>

@@ -168,6 +168,17 @@ export function Assinar() {
                   <strong>{assin ? new Date(assin.em).toLocaleString('pt-BR') : '—'}</strong>
                   .
                 </p>
+                {assin?.hash && (
+                  <span className="field__hint">
+                    Integridade do documento — SHA-256 do conteúdo assinado:
+                    <code className="hash-code">{assin.hash}</code>
+                    {assin.ip && (
+                      <>
+                        Registrado pelo IP <strong>{assin.ip}</strong>
+                      </>
+                    )}
+                  </span>
+                )}
                 <span className="field__hint">
                   {faltaPrestador
                     ? `Ainda falta a assinatura do prestador (${profile?.nome ?? 'prestador'}) — combine com ele para concluir o contrato.`

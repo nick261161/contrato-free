@@ -8,6 +8,7 @@
 import type { jsPDF } from 'jspdf'
 import type { Contract, FreelancerProfile } from '../types'
 import { getProfile } from './api'
+import { CLAUSULAS_OPCIONAIS, NICHOS } from './clausulas'
 
 const M = 18 // margem em mm
 const W = 210
@@ -218,14 +219,34 @@ export async function buildContractPdf(
   }
   y += 16
 
-  sectionTitle('1. Objeto do contrato')
-  paragraph(contract.descricao)
+  // Seções dinâmicas (mesma regra do ContractPreview): objeto + termos
+  // padrão sempre; cláusulas-base do nicho e opcionais quando ativas.
+  const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
+  const opcionais = CLAUSULAS_OPCIONAIS.filter(
+    (item) => contract.clausulas?.[item.chave],
+  )
 
-  sectionTitle('2. Condições padrão do prestador')
-  paragraph(profile.termosPadrao)
+  const secoes: Array<{ titulo: string; conteudo: string }> = [
+    { titulo: 'Objeto do contrato', conteudo: contract.descricao },
+    { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao },
+  ]
+  if (nichoDef) {
+    secoes.push({
+      titulo: `Cláusulas-base — ${nichoDef.label}`,
+      conteudo: nichoDef.clausulas.join(' '),
+    })
+  }
+  for (const item of opcionais) {
+    secoes.push({ titulo: item.titulo, conteudo: item.texto })
+  }
+
+  secoes.forEach((secao, index) => {
+    sectionTitle(`${index + 1}. ${secao.titulo}`)
+    paragraph(secao.conteudo)
+  })
 
   // -------------------------------------------------------------- assinaturas
-  sectionTitle('3. Assinaturas')
+  sectionTitle(`${secoes.length + 1}. Assinaturas`)
 
   const signW = (CW - 10) / 2
   const areaH = 26 // altura reservada para o desenho/nome digitado (mm)
@@ -303,6 +324,19 @@ export async function buildContractPdf(
     for (const line of doc.splitTextToSize(stamp, signW)) {
       doc.text(line, col.x + signW / 2, sy, { align: 'center' })
       sy += 4
+    }
+
+    // integridade: hash SHA-256 do conteúdo + IP (registrados na assinatura)
+    if (col.sig?.hash) {
+      doc.setFontSize(6.5)
+      doc.setTextColor(...SOFT)
+      const integridade = `SHA-256: ${col.sig.hash}${
+        col.sig.ip ? ` · IP: ${col.sig.ip}` : ''
+      }`
+      for (const line of doc.splitTextToSize(integridade, signW)) {
+        doc.text(line, col.x + signW / 2, sy + 1, { align: 'center' })
+        sy += 3.5
+      }
     }
     y = Math.max(y, sy + 6)
   }

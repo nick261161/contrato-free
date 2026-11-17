@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { requerUsuario } from '../auth.js'
 import {
@@ -12,6 +12,7 @@ import { httpError, wrap } from '../http.js'
 export const contractsRouter = Router()
 
 const STATUS_VALIDOS = ['rascunho', 'pendente', 'assinado', 'concluido']
+const CLAUSULAS_CHAVES = ['multa', 'nda', 'portfolio', 'rescisao']
 
 /** Normaliza e valida o payload de contrato vindo do front. */
 function parseContrato(body) {
@@ -21,6 +22,8 @@ function parseContrato(body) {
 
   if (!titulo) throw httpError(400, 'Título é obrigatório.')
   if (!nomeCliente) throw httpError(400, 'Informe o nome do cliente.')
+
+  const clausulasRaw = body?.clausulas ?? {}
 
   return {
     titulo,
@@ -37,7 +40,51 @@ function parseContrato(body) {
     status: STATUS_VALIDOS.includes(body?.status) ? body.status : 'rascunho',
     assinaturaPrestador: body?.assinaturaPrestador ?? null,
     assinaturaContratante: body?.assinaturaContratante ?? null,
+    nicho: String(body?.nicho ?? '').trim(),
+    clausulas: Object.fromEntries(
+      CLAUSULAS_CHAVES.map((chave) => [chave, Boolean(clausulasRaw[chave])]),
+    ),
   }
+}
+
+/**
+ * SHA-256 (hex) do CONTEÚDO do contrato no momento da assinatura — sem
+ * status e sem as assinaturas, para que as DUAS partes registrem o MESMO
+ * hash do documento. A ordem dos campos é fixa (igual ao modo mock em
+ * src/services/canonico.ts) porque JSONB do Postgres reordena chaves.
+ */
+function sha256Conteudo(row) {
+  const payload = JSON.stringify({
+    id: row.id,
+    titulo: row.titulo,
+    cliente: {
+      nome: row.cliente?.nome ?? '',
+      email: row.cliente?.email ?? '',
+      cpfCnpj: row.cliente?.cpfCnpj ?? '',
+      endereco: row.cliente?.endereco ?? '',
+    },
+    valor: Number(row.valor),
+    dataInicio: row.data_inicio,
+    prazoDias: row.prazo_dias,
+    descricao: row.descricao,
+    nicho: row.nicho ?? '',
+    clausulas: {
+      multa: Boolean(row.clausulas?.multa),
+      nda: Boolean(row.clausulas?.nda),
+      portfolio: Boolean(row.clausulas?.portfolio),
+      rescisao: Boolean(row.clausulas?.rescisao),
+    },
+    criadoEm: new Date(row.criado_em).toISOString(),
+  })
+  return createHash('sha256').update(payload).digest('hex')
+}
+
+/** IP do cliente: atrás do proxy da Vercel vale o x-forwarded-for original. */
+function ipDoCliente(req) {
+  const encaminhado = String(req.headers['x-forwarded-for'] ?? '')
+    .split(',')[0]
+    .trim()
+  return encaminhado || req.ip || ''
 }
 
 /** GET /contracts — lista da CONTA logada (mais recentes primeiro). */
@@ -103,8 +150,8 @@ contractsRouter.post(
       const { rows } = await tx.query(
         `INSERT INTO contracts
            (id, titulo, cliente, valor, data_inicio, prazo_dias, descricao, status,
-            assinatura_prestador, assinatura_contratante, user_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            assinatura_prestador, assinatura_contratante, user_id, nicho, clausulas)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
           id,
@@ -118,6 +165,8 @@ contractsRouter.post(
           dados.assinaturaPrestador,
           dados.assinaturaContratante,
           req.usuarioId,
+          dados.nicho,
+          dados.clausulas,
         ],
       )
       await upsertCliente(
@@ -144,8 +193,9 @@ contractsRouter.put(
         `UPDATE contracts
             SET titulo = $1, cliente = $2, valor = $3, data_inicio = $4,
                 prazo_dias = $5, descricao = $6, status = $7,
-                assinatura_prestador = $8, assinatura_contratante = $9
-          WHERE id = $10 AND user_id = $11
+                assinatura_prestador = $8, assinatura_contratante = $9,
+                nicho = $10, clausulas = $11
+          WHERE id = $12 AND user_id = $13
           RETURNING *`,
         [
           dados.titulo,
@@ -157,6 +207,8 @@ contractsRouter.put(
           dados.status,
           dados.assinaturaPrestador,
           dados.assinaturaContratante,
+          dados.nicho,
+          dados.clausulas,
           req.params.id,
           req.usuarioId,
         ],
@@ -213,6 +265,11 @@ contractsRouter.post(
 
     const nova = { por: nome, em: new Date().toISOString() }
     if (imagem) nova.imagem = imagem
+    // Integridade da assinatura: hash SHA-256 do conteúdo + IP de quem assinou
+    // (a data/hora já fica em `em`). As DUAS partes registram o mesmo hash.
+    nova.hash = sha256Conteudo(row)
+    const ip = ipDoCliente(req)
+    if (ip) nova.ip = ip
 
     const prestador = quem === 'prestador' ? nova : row.assinatura_prestador
     const contratante = quem === 'contratante' ? nova : row.assinatura_contratante

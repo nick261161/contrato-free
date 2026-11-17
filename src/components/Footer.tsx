@@ -33,6 +33,11 @@ export function Footer() {
 
       <div className="container footer__bottom">
         <span>© {new Date().getFullYear()} ContratoFree — Projeto acadêmico.</span>
+        <span className="footer__disclaimer">
+          Modelos educativos e informativos — <strong>não substituem a revisão de um
+          advogado</strong> para casos complexos.{' '}
+          <Link to="/termos">Ler os termos</Link>
+        </span>
       </div>
     </footer>
   )

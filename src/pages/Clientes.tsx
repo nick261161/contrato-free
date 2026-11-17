@@ -9,6 +9,8 @@ import { Sidebar } from '../components/Sidebar'
 import { Tilt } from '../components/Tilt'
 import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
+import { useConsultaCnpjCep } from '../hooks/useConsultaCnpjCep'
+import { formatarCEP } from '../services/brasil'
 import type { Client, SavedClient } from '../types'
 
 const emptyForm: Client = {
@@ -30,6 +32,29 @@ export function Clientes() {
   const [errors, setErrors] = useState<Partial<Record<keyof Client, string>>>({})
   const [saving, setSaving] = useState(false)
   const [removendo, setRemovendo] = useState(false)
+  // CEP é auxiliar de preenchimento (não é coluna do cliente): só existe no modal
+  const [cep, setCep] = useState('')
+
+  // CNPJ/CEP automáticos pela BrasilAPI — só preenchem campos vazios
+  const consulta = useConsultaCnpjCep({
+    cpfCnpj: form.cpfCnpj,
+    cep,
+    onEmpresa: (empresa) => {
+      setForm((current) => ({
+        ...current,
+        nome: current.nome.trim() || empresa.nome,
+        endereco: current.endereco.trim() || empresa.endereco,
+      }))
+      setCep((current) => current || formatarCEP(empresa.cep))
+    },
+    onEndereco: (endereco, sobrescrever) => {
+      setForm((current) =>
+        sobrescrever || !current.endereco.trim()
+          ? { ...current, endereco }
+          : current,
+      )
+    },
+  })
 
   function update(field: keyof Client, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -39,6 +64,7 @@ export function Clientes() {
   function openNew() {
     setEditing(null)
     setForm(emptyForm)
+    setCep('')
     setErrors({})
     setOpen(true)
   }
@@ -51,6 +77,7 @@ export function Clientes() {
       cpfCnpj: client.cpfCnpj,
       endereco: client.endereco,
     })
+    setCep('')
     setErrors({})
     setOpen(true)
   }
@@ -230,7 +257,40 @@ export function Clientes() {
             placeholder="00.000.000/0000-00"
             value={form.cpfCnpj}
             onChange={(event) => update('cpfCnpj', event.target.value)}
+            hint={
+              consulta.dicaCnpj?.texto ??
+              'CNPJ preenche nome e endereço automaticamente (BrasilAPI).'
+            }
           />
+          <div className="field">
+            <label className="field__label" htmlFor="cliente-cep">
+              CEP (opcional)
+            </label>
+            <div className="lookup">
+              <input
+                id="cliente-cep"
+                className="field__control"
+                placeholder="00000-000"
+                inputMode="numeric"
+                value={cep}
+                onChange={(event) => setCep(event.target.value)}
+              />
+              <Button
+                variant="secondary"
+                type="button"
+                disabled={consulta.buscandoCep}
+                onClick={() => void consulta.consultarCepAgora(cep)}
+              >
+                {consulta.buscandoCep ? 'Buscando…' : '🔍 Buscar'}
+              </Button>
+            </div>
+            {consulta.dicaCep &&
+              (consulta.dicaCep.tipo === 'erro' ? (
+                <span className="field__error">{consulta.dicaCep.texto}</span>
+              ) : (
+                <span className="field__hint">{consulta.dicaCep.texto}</span>
+              ))}
+          </div>
           <Input
             label="Endereço"
             name="endereco"
