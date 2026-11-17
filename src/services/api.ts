@@ -21,7 +21,7 @@ import type {
   SignRole,
   Signature,
 } from '../types'
-import { authClient, EVENTO_SESSAO_EXPIRADA } from './auth'
+import { authClient, definirTokenSessao, EVENTO_SESSAO_EXPIRADA, tokenSessaoReserva } from './auth'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const MOCK_DELAY_MS = 600
@@ -33,32 +33,73 @@ const CONTRACTS_KEY = 'contratofree.mock.contracts'
 const CLIENTS_KEY = 'contratofree.mock.clients'
 const PROFILE_KEY = 'contratofree.mock.profile'
 
+/** Shape da sessão devolvida por `authClient.getSession()` (SDK Better Auth). */
+type SessaoSdk = { data?: { session?: { token?: string } | null } | null }
+
+/** Token da sessão atual: cache do SDK primeiro, reserva do sign-in por último. */
+async function obterTokenSessao(): Promise<string | null> {
+  try {
+    const sessao = (await authClient.getSession()) as SessaoSdk | null | undefined
+    const token = sessao?.data?.session?.token
+    if (token) return token
+  } catch {
+    // sem rede ou sem sessão ativa: cai na reserva gravada no sign-in
+  }
+  return tokenSessaoReserva()
+}
+
+/**
+ * Busca uma sessão IGNORANDO o cache do SDK (header `X-Force-Fetch`,
+ * tratado pelo customFetchImpl do @neon/auth). Usado quando a API responde
+ * 401: pode ser que o token em uso esteja desatualizado e a sessão real
+ * (cookie) ainda esteja boa.
+ */
+async function sessaoForcada(): Promise<string | null> {
+  try {
+    const sessao = (await authClient.getSession({
+      fetchOptions: { headers: { 'X-Force-Fetch': 'true' } },
+    })) as SessaoSdk | null | undefined
+    return sessao?.data?.session?.token ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Helper genérico para chamadas REST reais. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
   // Envia o token da sessão do Neon Auth: a API valida ele e usa o
   // usuário para isolar contratos/clientes/perfil por conta.
-  try {
-    const sessao = await authClient.getSession()
-    const token = (
-      sessao?.data as { session?: { token?: string } } | null | undefined
-    )?.session?.token
-    if (token) headers.Authorization = `Bearer ${token}`
-  } catch {
-    // sem sessão ativa: rotas públicas (ex.: página de assinatura) seguem sem token
+  let token = await obterTokenSessao()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const enviar = () =>
+    fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+    })
+
+  let response = await enviar()
+
+  // 401 com token em uso: pode ser uma reserva/cached desatualizado. Busca uma
+  // sessão fresca (sem cache) e repete a chamada UMA vez antes de desistir.
+  if (response.status === 401 && token) {
+    const tokenNovo = await sessaoForcada()
+    if (tokenNovo && tokenNovo !== token) {
+      token = tokenNovo
+      definirTokenSessao(tokenNovo)
+      headers.Authorization = `Bearer ${tokenNovo}`
+      response = await enviar()
+    }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
-  })
-
   if (!response.ok) {
-    // 401 da API = a sessão não vale mais (expirada, revogada ou o SDK
-    // nem token devolveu): avisa o app. O AuthContext só age se havia
-    // usuário logado — visitante de página pública é ignorado lá.
-    if (response.status === 401) {
+    // 401 da API só encerra a sessão quando um token FOI enviado e a API o
+    // rejeitou (expirada ou revogada). Requisição sem token não derruba o
+    // login — era isso que mostrava "Sua sessão expirou" logo após entrar.
+    if (response.status === 401 && token) {
+      definirTokenSessao(null)
       window.dispatchEvent(new CustomEvent(EVENTO_SESSAO_EXPIRADA))
     }
     let detalhe = response.statusText || `HTTP ${response.status}`

@@ -4,6 +4,7 @@ import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input } from '../components/Input'
+import { Tilt } from '../components/Tilt'
 import { authClient, mensagemDeErro } from '../services/auth'
 
 /**
@@ -64,7 +65,7 @@ export function RedefinirSenha() {
       <Header />
 
       <main className="auth">
-        <div className="auth__card">
+        <Tilt className="auth__card" max={5}>
           <span className="auth__tag">Nova senha</span>
           <h1>{pronto ? 'Senha redefinida' : 'Redefinir sua senha'}</h1>
           <p>
@@ -122,7 +123,7 @@ export function RedefinirSenha() {
               Voltar ao login
             </Link>
           </p>
-        </div>
+        </Tilt>
       </main>
 
       <Footer />

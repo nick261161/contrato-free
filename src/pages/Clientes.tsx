@@ -6,6 +6,7 @@ import { Header } from '../components/Header'
 import { Input } from '../components/Input'
 import { Modal } from '../components/Modal'
 import { Sidebar } from '../components/Sidebar'
+import { Tilt } from '../components/Tilt'
 import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
 import type { Client, SavedClient } from '../types'
@@ -146,7 +147,7 @@ export function Clientes() {
           ) : (
             <div className="clients__grid">
               {clients.map((client) => (
-                <article key={client.id} className="client-card">
+                <Tilt key={client.id} as="article" className="client-card">
                   <div className="client-card__top">
                     <span className="client-card__avatar">
                       {client.nome.charAt(0).toUpperCase()}
@@ -182,7 +183,7 @@ export function Clientes() {
                       Excluir
                     </Button>
                   </div>
-                </article>
+                </Tilt>
               ))}
             </div>
           )}

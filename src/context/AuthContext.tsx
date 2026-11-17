@@ -8,6 +8,7 @@ import {
 import type { AuthUser } from '../types'
 import {
   authClient,
+  definirTokenSessao,
   EVENTO_SESSAO_EXPIRADA,
   mensagemDeErro,
   type UsuarioAuth,
@@ -40,6 +41,16 @@ function paraUsuario(usuario: UsuarioAuth): AuthUser {
 function extrairUsuario(data: unknown): UsuarioAuth | null {
   const usuario = (data as { user?: UsuarioAuth | null } | null)?.user
   return usuario && usuario.email ? usuario : null
+}
+
+/**
+ * Extrai o token de sessão do corpo do sign-in/sign-up do Better Auth
+ * (`{ token, user }`). Guardado como reserva pelo request() da API enquanto o
+ * SDK ainda não devolve a sessão via getSession().
+ */
+function extrairToken(data: unknown): string | null {
+  const token = (data as { token?: unknown } | null | undefined)?.token
+  return typeof token === 'string' && token.length > 0 ? token : null
 }
 
 /** Monta um Error com a mensagem traduzida (retorno { error } ou exceção HTTP). */
@@ -98,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const resultado = await authClient.signIn.email({ email, password: senha })
       if (resultado.error) throw erroDeAuth(resultado.error)
+      definirTokenSessao(extrairToken(resultado.data))
 
       const usuario =
         extrairUsuario(resultado.data) ??
@@ -119,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: senha,
       })
       if (resultado.error) throw erroDeAuth(resultado.error)
+      definirTokenSessao(extrairToken(resultado.data))
 
       const usuario =
         extrairUsuario(resultado.data) ??
@@ -140,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // sem conexão: encerra a sessão local mesmo assim
     }
+    definirTokenSessao(null)
     setUser(null)
   }
 

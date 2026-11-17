@@ -4,6 +4,7 @@ import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input } from '../components/Input'
+import { Tilt } from '../components/Tilt'
 import { authClient, mensagemDeErro } from '../services/auth'
 
 /**
@@ -49,7 +50,7 @@ export function EsqueciSenha() {
       <Header />
 
       <main className="auth">
-        <div className="auth__card">
+        <Tilt className="auth__card" max={5}>
           <span className="auth__tag">Recuperar acesso</span>
           <h1>Esqueci minha senha</h1>
           <p>
@@ -97,7 +98,7 @@ export function EsqueciSenha() {
               </>
             )}
           </p>
-        </div>
+        </Tilt>
       </main>
 
       <Footer />

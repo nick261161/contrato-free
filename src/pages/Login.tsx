@@ -4,6 +4,7 @@ import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
 import { Input } from '../components/Input'
+import { Tilt } from '../components/Tilt'
 import { FLAG_SESSAO_EXPIRADA, useAuth } from '../context/AuthContext'
 
 type Modo = 'entrar' | 'criar'
@@ -82,7 +83,7 @@ export function Login() {
       <Header />
 
       <main className="auth">
-        <div className="auth__card">
+        <Tilt className="auth__card" max={5}>
           <span className="auth__tag">{criando ? 'Criar conta' : 'Acesso do freelancer'}</span>
           <h1>{criando ? 'Crie sua conta' : 'Entrar na sua conta'}</h1>
           <p>
@@ -189,7 +190,7 @@ export function Login() {
               </>
             )}
           </p>
-        </div>
+        </Tilt>
       </main>
 
       <Footer />

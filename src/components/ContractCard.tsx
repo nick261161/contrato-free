@@ -1,4 +1,5 @@
 import { STATUS_LABEL, type Contract } from '../types'
+import { Tilt } from './Tilt'
 
 interface ContractCardProps {
   contract: Contract
@@ -22,7 +23,7 @@ export function ContractCard({ contract, onView }: ContractCardProps) {
     contract.assinaturaContratante?.em ?? contract.assinaturaPrestador?.em
 
   return (
-    <article className="contract-card">
+    <Tilt as="article" className="contract-card">
       <div className="contract-card__top">
         <span className={`badge badge--${contract.status}`}>
           {STATUS_LABEL[contract.status]}
@@ -66,6 +67,6 @@ export function ContractCard({ contract, onView }: ContractCardProps) {
       <button className="contract-card__action" onClick={() => onView(contract)}>
         Ver detalhes →
       </button>
-    </article>
+    </Tilt>
   )
 }

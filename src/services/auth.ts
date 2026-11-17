@@ -27,6 +27,29 @@ export const authClient = createAuthClient(baseUrl, {
  */
 export const EVENTO_SESSAO_EXPIRADA = 'contratofree:sessao-expirada'
 
+/**
+ * Token da sessão recém-iniciada pelo sign-in/sign-up, guardado como reserva.
+ *
+ * O Better Auth devolve `{ token, user }` no sign-in — sem `session` — então o
+ * cache interno do SDK não é populado ali: o primeiro `getSession()` só encontra
+ * o token depois de uma ida ao servidor (`/get-session`). Enquanto isso não
+ * acontece (rede lenta, cookie ainda não visível), as chamadas da API sairiam
+ * SEM Authorization, a API responderia 401 e o app derrubava a sessão recém-criada
+ * (o "Sua sessão expirou" logo após o login). O token do próprio sign-in cobre
+ * esse intervalo até o SDK passar a devolver a sessão.
+ */
+let tokenReserva: string | null = null
+
+/** Registra (ou limpa, ao receber `null`) o token da sessão atual. */
+export function definirTokenSessao(token: string | null | undefined): void {
+  tokenReserva = token ?? null
+}
+
+/** Token guardado no sign-in — reserva usada quando `getSession()` não traz. */
+export function tokenSessaoReserva(): string | null {
+  return tokenReserva
+}
+
 /** Usuário no formato devolvido pelo Better Auth (name/email). */
 export interface UsuarioAuth {
   name?: string | null

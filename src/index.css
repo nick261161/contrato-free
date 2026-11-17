@@ -1934,3 +1934,447 @@ select.field__control {
   color: var(--text-soft);
   font-size: 0.93rem;
 }
+
+/* =========================================================
+   Modernização — cards 3D, carrosséis arrastáveis e polimento
+   ========================================================= */
+
+/* ---------------- Card com tilt 3D (Tilt.tsx) ---------------- */
+.tilt {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease, border-color 0.22s ease;
+  will-change: transform;
+}
+
+.tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Brilho que segue o cursor: visível nos cards brancos (o branco puro
+     não aparece sobre fundo branco). */
+  background: radial-gradient(
+    40rem circle at var(--glare-x, 50%) var(--glare-y, 50%),
+    rgba(79, 70, 229, 0.1),
+    rgba(6, 182, 212, 0.05) 32%,
+    transparent 58%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.tilt:hover {
+  transform: translateY(-4px);
+  border-color: #c7d2fe;
+  box-shadow: var(--shadow);
+}
+
+.tilt:hover::after {
+  opacity: 1;
+}
+
+.tilt:active {
+  transition-duration: 0.08s;
+}
+
+/* ---------------- Carrossel arrastável (Carousel.tsx) ---------------- */
+.carousel {
+  position: relative;
+}
+
+.carousel__viewport {
+  position: relative;
+}
+
+.carousel__track {
+  display: flex;
+  gap: 1.3rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 0.35rem 0.25rem 1.1rem;
+  margin: -0.35rem -0.25rem -1.1rem;
+  cursor: grab;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel.is-dragging .carousel__track {
+  cursor: grabbing;
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+  user-select: none;
+}
+
+/* Só depois do limiar de arrasto (is-captured): um clique simples nunca
+   perde o alvo dos botões dentro dos cards. */
+.carousel.is-captured .carousel__track * {
+  pointer-events: none;
+}
+
+.carousel__item {
+  flex: 0 0 clamp(240px, 26%, 320px);
+  scroll-snap-align: start;
+  min-width: 0;
+}
+
+/* Funcionalidades em destaque: 1 card de largura total por vez.
+   Com 4 itens, só assim cada seta/dot/ponto de snap é distinto. */
+.carousel--features .carousel__item {
+  flex: 0 0 100%;
+}
+
+.carousel--features .feature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 14rem;
+  padding: 2.4rem 2rem;
+}
+
+.carousel--features .feature__icon {
+  font-size: 2.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.carousel--features .feature h3 {
+  font-size: 1.3rem;
+}
+
+.carousel--features .feature p {
+  max-width: 54ch;
+}
+
+.carousel__item > * {
+  height: 100%;
+}
+
+.carousel__btn {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: 0.18s ease;
+}
+
+.carousel__btn:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.carousel__btn:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.carousel__btn--prev {
+  left: -12px;
+}
+
+.carousel__btn--next {
+  right: -12px;
+}
+
+.carousel__dots {
+  position: relative;
+  /* Acima do viewport (position:relative): sem isso a faixa, que sobrepõe
+     os dots pela margem negativa, engolia os cliques deles. */
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.carousel__dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #c7cbdd;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.carousel__dot:hover {
+  background: var(--primary-soft);
+}
+
+.carousel__dot.is-active {
+  width: 26px;
+  background: var(--primary);
+}
+
+/* ---------------- Polimento geral ---------------- */
+
+/* Barra de rolagem mais fina e no tom do design */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7cbdd transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c7cbdd;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #a5b4fc;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Header com vidro fosco ao rolar */
+.header {
+  backdrop-filter: blur(10px) saturate(1.4);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+/* Hero com blob animado de fundo */
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  top: -20vmax;
+  right: -12vmax;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(79, 70, 229, 0.16),
+    rgba(6, 182, 212, 0.08) 45%,
+    transparent 70%
+  );
+  animation: blob-float 14s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes blob-float {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-6%, 8%, 0) scale(1.12);
+  }
+}
+
+/* Entrada suave das seções da Home.
+   "backwards" (e não "both"): ao terminar, a animação deixa de aplicar o
+   transform, liberando o estilo inline do Tilt (tilt 3D). */
+.hero__content,
+.hero__card,
+.section__head,
+.feature,
+.steps .step,
+.cta__inner {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.hero__card {
+  animation-delay: 0.12s;
+}
+
+.section__head {
+  animation-delay: 0.05s;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Botões com brilho de gradiente */
+.btn--primary {
+  background-image: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    #6366f1 55%,
+    var(--accent) 130%
+  );
+  background-size: 160% 160%;
+  transition: 0.22s ease;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-position: 100% 100%;
+  box-shadow: 0 12px 26px rgba(79, 70, 229, 0.35);
+}
+
+/* Modal com entrada em escala */
+.modal {
+  animation: modal-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal__overlay {
+  animation: overlay-in 0.2s ease;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Cards de métrica e contratos ganham hover mais vivo */
+.metric,
+.contract-card,
+.client-card,
+.feature,
+.step,
+.panel,
+.auth__card,
+.preview,
+.hero__card {
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.metric:hover,
+.contract-card:hover,
+.client-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: #c7d2fe;
+}
+
+/* Painéis e preview com sombra ao passar o mouse */
+.panel:hover,
+.preview:hover {
+  box-shadow: var(--shadow-soft);
+}
+
+/* Badge com leve gradiente para ganhar vida */
+.badge {
+  letter-spacing: 0.02em;
+}
+
+.badge--pendente {
+  background-image: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.badge--assinado {
+  background-image: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.badge--concluido {
+  background-image: linear-gradient(135deg, #dbeafe, #bfdbfe);
+}
+
+/* Indicador de passo ativo com pulso (no número, para não brigar com a
+   animação de entrada do card) */
+.steps .step--active .step__number {
+  animation: step-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes step-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+  }
+}
+
+/* Foco visível consistente (acessibilidade) */
+:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.45);
+  outline-offset: 2px;
+}
+
+/* Respeita quem pediu menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .tilt {
+    transform: none !important;
+  }
+}
+
+/* ---------------- Responsivo do carrossel ---------------- */
+@media (max-width: 860px) {
+  .carousel__item {
+    flex-basis: clamp(220px, 72%, 300px);
+  }
+
+  .carousel__btn--prev {
+    left: -4px;
+  }
+
+  .carousel__btn--next {
+    right: -4px;
+  }
+}

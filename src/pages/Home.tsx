@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Carousel } from '../components/Carousel'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
+import { Tilt } from '../components/Tilt'
 
 const features = [
   {
@@ -93,7 +95,7 @@ export function Home() {
               </div>
             </div>
 
-            <div className="hero__card" aria-hidden="true">
+            <Tilt className="hero__card" aria-hidden={true}>
               <div className="hero__card-head">
                 <span className="badge badge--pendente">Prévia</span>
                 <span>Contrato #1004</span>
@@ -112,7 +114,7 @@ export function Home() {
                 <span style={{ width: `${((highlight + 1) / steps.length) * 100}%` }} />
               </div>
               <small>Etapa {highlight + 1} de {steps.length}: {steps[highlight].title}</small>
-            </div>
+            </Tilt>
           </div>
         </section>
 
@@ -123,15 +125,15 @@ export function Home() {
               <h2>Tudo o que você precisa para contratar certo</h2>
             </header>
 
-            <div className="features">
+            <Carousel label="Funcionalidades" className="carousel--features">
               {features.map((feature) => (
-                <article key={feature.title} className="feature">
+                <Tilt key={feature.title} as="article" className="feature">
                   <span className="feature__icon">{feature.icon}</span>
                   <h3>{feature.title}</h3>
                   <p>{feature.text}</p>
-                </article>
+                </Tilt>
               ))}
-            </div>
+            </Carousel>
           </div>
         </section>
 
@@ -144,14 +146,15 @@ export function Home() {
 
             <div className="steps">
               {steps.map((step, index) => (
-                <article
+                <Tilt
                   key={step.n}
+                  as="article"
                   className={`step ${index === highlight ? 'step--active' : ''}`}
                 >
                   <span className="step__number">{step.n}</span>
                   <h3>{step.title}</h3>
                   <p>{step.text}</p>
-                </article>
+                </Tilt>
               ))}
             </div>
           </div>
