@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>ContratoFree — Apresentação do site</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0d20;
+    --panel: #121636;
+    --panel2: #171c44;
+    --line: rgba(148, 163, 219, 0.18);
+    --cyan: #22d3ee;
+    --indigo: #6366f1;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --amber: #fbbf24;
+    --green: #34d399;
+    --text: #e8ecff;
+    --muted: #a8b0d4;
+    --dim: #7d86ad;
+    --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  html, body { background: var(--bg); font-family: var(--font); color: var(--text); }
+  @page { size: 1280px 720px; margin: 0; }
+
+  .deck { display: grid; grid-template-columns: repeat(4, 1280px); gap: 18px; padding: 18px; width: max-content; }
+  .slide {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    padding: 44px 64px 56px;
+    background:
+      radial-gradient(900px 500px at 90% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
+      radial-gradient(700px 480px at -10% 110%, rgba(34, 211, 238, 0.12), transparent 60%),
+      var(--bg);
+    break-after: page;
+  }
+  .slide:last-child { break-after: auto; }
+
+  /* topo: marca + número */
+  .brand { display: flex; align-items: center; justify-content: space-between; }
+  .brand__logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: 0.02em; }
+  .brand__mark {
+    display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--indigo), var(--cyan));
+    font-size: 16px; color: #fff;
+  }
+  .brand__accent { color: var(--cyan); }
+  .brand__num { font-size: 13px; color: var(--dim); letter-spacing: 0.18em; font-weight: 700; }
+
+  .eyebrow { margin-top: 26px; font-size: 13px; font-weight: 800; letter-spacing: 0.34em; color: var(--cyan); text-transform: uppercase; }
+  .big-title { margin-top: 8px; font-size: 44px; line-height: 1.1; font-weight: 800; letter-spacing: -0.01em; }
+  .big-title span { color: var(--cyan); }
+  .lead { margin-top: 12px; font-size: 19px; line-height: 1.5; color: var(--muted); max-width: 980px; }
+
+  .foot {
+    position: absolute; left: 64px; right: 64px; bottom: 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; color: var(--dim); letter-spacing: 0.06em;
+  }
+  .foot b { color: var(--muted); }
+
+  /* capa */
+  .s1 { display: flex; flex-direction: column; }
+  .s1-head { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 18px; }
+  .s1-body { flex: 1; display: grid; grid-template-columns: 1.25fr 1fr; gap: 56px; align-items: center; }
+  .s1-title { font-size: 88px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .s1-title span { color: var(--cyan); }
+  .s1-sub { margin-top: 20px; font-size: 26px; line-height: 1.4; color: var(--muted); }
+  .s1-links { margin-top: 26px; display: flex; flex-direction: column; gap: 8px; font-size: 17px; font-weight: 700; }
+  .s1-links .k { color: var(--dim); font-weight: 600; margin-right: 8px; }
+  .s1-links .v-site { color: var(--cyan); }
+  .s1-links .v-repo { color: var(--purple); }
+  .s1-meta { display: flex; flex-direction: column; gap: 14px; }
+  .s1-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; }
+  .s1-card b { display: block; font-size: 13px; letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase; margin-bottom: 6px; }
+  .s1-card span { font-size: 19px; font-weight: 700; }
+  .s1-quote { margin-top: 6px; font-size: 15.5px; line-height: 1.55; color: var(--muted); font-style: italic; border-left: 3px solid var(--indigo); padding-left: 14px; }
+
+  /* grades */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 26px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .card h3 { font-size: 21px; font-weight: 800; margin-bottom: 10px; }
+  .card p { font-size: 15.5px; line-height: 1.55; color: var(--muted); }
+  .card .icon { font-size: 30px; margin-bottom: 12px; display: block; }
+  .card--cyan h3 { color: var(--cyan); }
+  .card--indigo h3 { color: var(--purple); }
+  .card--amber h3 { color: var(--amber); }
+  .card--green h3 { color: var(--green); }
+  .card--pink h3 { color: var(--pink); }
+  .card ul { list-style: none; }
+  .card ul li { position: relative; padding-left: 22px; font-size: 15.5px; line-height: 1.6; color: var(--muted); }
+  .card ul li::before { content: "▸"; position: absolute; left: 0; color: var(--cyan); font-weight: 800; }
+  .card ul li b { color: var(--text); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-size: 15px; font-weight: 600; color: var(--muted); }
+  .chip b { color: var(--text); }
+
+  .stat { text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 12px; }
+  .stat b { display: block; font-size: 40px; font-weight: 800; color: var(--cyan); line-height: 1.1; }
+  .stat span { font-size: 14px; color: var(--muted); }
+
+  .badge { display: inline-block; background: rgba(34, 211, 238, 0.12); border: 1px solid rgba(34, 211, 238, 0.4); color: var(--cyan); font-size: 13px; font-weight: 800; letter-spacing: 0.14em; padding: 6px 14px; border-radius: 999px; text-transform: uppercase; }
+
+  .note { margin-top: 18px; background: var(--panel2); border: 1px dashed rgba(148, 163, 219, 0.35); border-radius: 12px; padding: 12px 18px; font-size: 15px; line-height: 1.5; color: var(--muted); }
+  .note b { color: var(--text); }
+
+  /* requisitos */
+  .req { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 26px; }
+  .req-col { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px; }
+  .req-col h3 { font-size: 17px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-bottom: 14px; }
+  .req-item { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; font-size: 16px; line-height: 1.45; }
+  .req-item .ok { color: var(--green); font-weight: 900; flex: none; }
+  .req-item b { color: var(--text); }
+  .req-item span { color: var(--muted); }
+
+  /* telas */
+  .pages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 26px; }
+  .page-chip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .page-chip b { display: block; font-size: 16.5px; }
+  .page-chip span { font-size: 13px; color: var(--dim); letter-spacing: 0.04em; }
+  .page-chip.pub { border-color: rgba(52, 211, 153, 0.5); }
+  .page-chip.pub b { color: var(--green); }
+
+  /* links (arquitetura + conclusão) */
+  .links-bar { display: flex; gap: 18px; margin-top: 20px; }
+  .link-pill { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 20px; font-size: 17px; }
+  .link-pill b { display: block; font-size: 12.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+  .link-pill .u-site { color: var(--cyan); font-weight: 800; }
+  .link-pill .u-repo { color: var(--purple); font-weight: 800; }
+
+  .stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; }
+  .stack .s { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: center; }
+  .stack .s b { display: block; font-size: 15.5px; }
+  .stack .s span { font-size: 12.5px; color: var(--dim); }
+
+  /* conclusão */
+  .s12 { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .s12 .big-title { font-size: 52px; }
+  .s12 .lead { max-width: 860px; text-align: center; }
+  .s12-cols { display: flex; gap: 40px; margin-top: 34px; }
+  .s12-col b { display: block; font-size: 15px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
+  .s12-col span { font-size: 17px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 1 · CAPA -->
+  <section class="slide s1">
+    <div class="s1-head">
+      <span class="brand__mark">§</span>
+      Contrato<span class="brand__accent">Free</span>
+    </div>
+    <div class="s1-body">
+      <div>
+        <div class="eyebrow">Apresentação do site</div>
+        <h1 class="s1-title">Contrato<span>Free</span></h1>
+        <p class="s1-sub">Automação de contratos para freelancers:<br>do briefing à assinatura em poucos minutos.</p>
+        <div class="s1-links">
+          <div><span class="k">Site no ar:</span><span class="v-site">contratofree.vercel.app</span></div>
+          <div><span class="k">Código-fonte:</span><span class="v-repo">github.com/nick261161/contrato-free</span></div>
+        </div>
+      </div>
+      <div class="s1-meta">
+        <div class="s1-card"><b>Apresentado por</b><span>[seu nome] — [componentes]</span></div>
+        <div class="s1-card"><b>Disciplina</b><span>Front-end Frameworks — Ciência da Computação</span></div>
+        <div class="s1-card"><b>Tecnologia principal</b><span>React.js + TypeScript (Vite)</span></div>
+        <p class="s1-quote">“Um contrato claro é a ponte entre o orçamento e o pagamento.”</p>
+      </div>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — Apresentação do site</span><span>01</span></div>
+  </section>
+
+  <!-- 2 · INTRODUÇÃO -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">02</div>
+    </div>
+    <div class="eyebrow">Introdução</div>
+    <h2 class="big-title">Por que um freelancer precisa de contratos?</h2>
+    <div class="grid3">
+      <div class="card card--cyan">
+        <span class="icon">⏳</span>
+        <h3>Horas perdidas</h3>
+        <p>Cada projeto começa com o mesmo ciclo: montar o contrato do zero, ajustar o texto e enviar por e-mail — repetido toda semana.</p>
+      </div>
+      <div class="card card--indigo">
+        <span class="icon">⚠️</span>
+        <h3>Escopo sem registro</h3>
+        <p>Sem cláusulas claras, cobrar as 3ª rodada de alteração vira discussão. O “combinado” morre na conversa do WhatsApp.</p>
+      </div>
+      <div class="card card--amber">
+        <span class="icon">✍️</span>
+        <h3>Assinatura trava</h3>
+        <p>Imprimir, assinar, escanear, enviar… o cliente espera e o pagamento atrasa. Papel não faz parte do fluxo digital.</p>
+      </div>
+    </div>
+    <div class="note"><b>Por isso existe o ContratoFree:</b> gerar o contrato em minutos, com cláusulas certas, e colher a assinatura do cliente por um link — sem papel, sem e-mail com anexo, sem retrabalho.</div>
+    <div class="foot"><span><b>ContratoFree</b> — Introdução</span><span>02</span></div>
+  </section>
+
+  <!-- 3 · O QUE É -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">03</div>
+    </div>
+    <div class="eyebrow">O que é</div>
+    <h2 class="big-title">O que é o ContratoFree</h2>
+    <div class="two">
+      <div class="card card--cyan">
+        <h3>Uma plataforma completa</h3>
+        <ul>
+          <li><b>Conta do freelancer:</b> login e painel com os contratos.</li>
+          <li><b>Wizard guiado:</b> 3 etapas — dados → escopo e cláusulas → revisão.</li>
+          <li><b>Prévia ao vivo:</b> o contrato se redesenha a cada campo.</li>
+          <li><b>Envio direto:</b> link de assinatura, WhatsApp ou PDF.</li>
+        </ul>
+      </div>
+      <div class="card card--indigo">
+        <h3>Como funciona o fluxo</h3>
+        <ul>
+          <li><b>1.</b> Freelancer gera o contrato com cliente, valor e prazo.</li>
+          <li><b>2.</b> Escolhe o nicho e liga as cláusulas que quer.</li>
+          <li><b>3.</b> Manda o link — o cliente assina <b>sem criar conta</b>.</li>
+          <li><b>4.</b> Baixa o PDF e o registro fica no painel.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip"><b>Páginas:</b> 12</span>
+      <span class="chip"><b>Componentes:</b> 15</span>
+      <span class="chip"><b>Custom hooks:</b> 4</span>
+      <span class="chip"><b>Idioma:</b> Português (pt-BR)</span>
+      <span class="chip"><b>100% gratuito</b> para começar</span>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — O que é</span><span>03</span></div>
+  </section>
+
+  <!-- 4 · VISÃO GERAL -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">04</div>
+    </div>
+    <div class="eyebrow">Visão geral</div>
+    <h2 class="big-title">O painel depois do login</h2>
+    <p class="lead">Tudo o que importa em uma tela: números do mês, contratos recentes e o próximo passo de cada um.</p>
+    <div class="grid4">
+      <div class="stat"><b>3</b><span>Contratos pendentes</span></div>
+      <div class="stat"><b>R$ 34,9 mil</b><span>Em contrato</span></div>
+      <div class="stat"><b>4</b><span>Clientes na agenda</span></div>
+      <div class="stat"><b>3</b><span>Assinados no mês</span></div>
+    </div>
+    <div class="two">
+      <div class="card">
+        <h3>Lista de contratos</h3>
+        <p>Busca por título ou cliente, filtro de status (rascunho, pendente, assinado, concluído) e ações rápidas: abrir, baixar PDF, enviar link e excluir.</p>
+      </div>
+      <div class="card">
+        <h3>Agenda de clientes</h3>
+        <p>CRM simples com nome, e-mail, CPF/CNPJ e endereço. Digitar o CNPJ preenche os dados sozinho pela BrasilAPI.</p>
+      </div>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — Visão geral</span><span>04</span></div>
+  </section>
+
+  <!-- 5 · FUNCIONALIDADES -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">05</div>
+    </div>
+    <div class="eyebrow">Funcionalidades</div>
+    <h2 class="big-title">Tudo o que o site faz</h2>
+    <div class="grid4">
+      <div class="card card--cyan"><span class="icon">📄</span><h3>Wizard em 3 etapas</h3><p>Dados do cliente → escopo, valor e cláusulas → revisão e geração.</p></div>
+      <div class="card card--indigo"><span class="icon">🔍</span><h3>CNPJ e CEP automáticos</h3><p>BrasilAPI preenche razão social e endereço ao digitar o documento.</p></div>
+      <div class="card card--amber"><span class="icon">🧩</span><h3>Cláusulas com switch</h3><p>Multa, NDA, portfólio e rescisão ligados ou desligados em 1 clique.</p></div>
+      <div class="card card--green"><span class="icon">🎯</span><h3>Nicho do freelancer</h3><p>Design, dev, social, vídeo ou redação — cada um com cláusulas-base.</p></div>
+      <div class="card card--pink"><span class="icon">✍️</span><h3>Assinatura digital</h3><p>Desenho no touch ou nome digitado, com data e hora automáticos.</p></div>
+      <div class="card card--cyan"><span class="icon">🔗</span><h3>Link público</h3><p>O cliente assina pelo celular, sem conta e sem aplicativo.</p></div>
+      <div class="card card--indigo"><span class="icon">📑</span><h3>PDF e impressão</h3><p>Documento padronizado com partes, cláusulas, assinaturas e hash.</p></div>
+      <div class="card card--amber"><span class="icon">💬</span><h3>Resumo no WhatsApp</h3><p>Botão gera a mensagem pronta com valor, prazo e link de assinatura.</p></div>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — Funcionalidades</span><span>05</span></div>
+  </section>
+
+  <!-- 6 · CLÁUSULAS E NICHO -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">06</div>
+    </div>
+    <div class="eyebrow">Cláusulas</div>
+    <h2 class="big-title">Contrato certo para cada ofício</h2>
+    <div class="two">
+      <div class="card card--cyan">
+        <h3>Escolha o nicho (cláusulas-base)</h3>
+        <ul>
+          <li><b>Design:</b> 2 rodadas de alteração por entrega.</li>
+          <li><b>Dev:</b> código + documentação e correções em 30 dias.</li>
+          <li><b>Social media:</b> calendário editorial e aprovação prévia.</li>
+          <li><b>Vídeo:</b> 2 revisões; arquivos brutos não inclusos.</li>
+          <li><b>Redação:</b> revisões e direitos de autor após pagamento.</li>
+        </ul>
+      </div>
+      <div class="card card--indigo">
+        <h3>Cláusulas opcionais (switch)</h3>
+        <ul>
+          <li><b>Multa por atraso:</b> 2% + juros de mora de 1% ao mês.</li>
+          <li><b>Confidencialidade (NDA):</b> sigilo por 5 anos.</li>
+          <li><b>Portfólio:</b> direito de exibir o projeto feito.</li>
+          <li><b>Rescisão:</b> aviso prévio de 15 dias.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note">A prévia e o PDF recalculam a numeração das seções sozinhos: <b>1. Objetivo → 2. Condições padrão → 3. Cláusulas-base → opcionais → assinaturas</b>.</div>
+    <div class="foot"><span><b>ContratoFree</b> — Cláusulas</span><span>06</span></div>
+  </section>
+
+  <!-- 7 · ASSINATURA E INTEGRIDADE -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">07</div>
+    </div>
+    <div class="eyebrow">Assinatura</div>
+    <h2 class="big-title">Assinatura com prova de integridade</h2>
+    <div class="grid3">
+      <div class="card card--green">
+        <span class="icon">🖊️</span>
+        <h3>Sem conta</h3>
+        <p>O link <b>/assinar/:id</b> abre direto: o cliente lê, assina no próprio celular e o contrato muda para “assinado”.</p>
+      </div>
+      <div class="card card--indigo">
+        <span class="icon">🔐</span>
+        <h3>Hash SHA-256</h3>
+        <p>O servidor calcula o hash do conteúdo no momento da assinatura. As duas partes registram <b>o mesmo hash</b>.</p>
+      </div>
+      <div class="card card--amber">
+        <span class="icon">🌐</span>
+        <h3>IP + data/hora</h3>
+        <p>Registrados junto com a assinatura e exibidos na tela, na prévia e no PDF — auditabilidade de verdade.</p>
+      </div>
+    </div>
+    <div class="note"><b>Fluxo do cliente:</b> abre o link → vê o contrato completo → digita o nome (ou desenha) → confirma → recebe a confirmação com hash e IP. <b>Não precisa instalar nada.</b></div>
+    <div class="foot"><span><b>ContratoFree</b> — Assinatura</span><span>07</span></div>
+  </section>
+
+  <!-- 8 · COMPARTILHAR -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">08</div>
+    </div>
+    <div class="eyebrow">Compartilhar</div>
+    <h2 class="big-title">Um contrato, três saídas</h2>
+    <div class="grid3">
+      <div class="card card--cyan">
+        <span class="icon">🔗</span>
+        <h3>Link de assinatura</h3>
+        <p>Um clique copia a URL pública. É o caminho mais rápido para o cliente assinar pelo celular.</p>
+      </div>
+      <div class="card card--green">
+        <span class="icon">💬</span>
+        <h3>WhatsApp com resumo</h3>
+        <p>O botão monta a mensagem pronta: saudação com o cliente, valor formatado, prazo e o link de assinatura.</p>
+      </div>
+      <div class="card card--indigo">
+        <span class="icon">✉️</span>
+        <h3>E-mail e PDF</h3>
+        <p>Abre o e-mail já escrito com o link, ou baixa o PDF do contrato com todas as cláusulas e assinaturas.</p>
+      </div>
+    </div>
+    <div class="note">A mensagem de WhatsApp sai no formato <b>wa.me</b> — abre o aplicativo com o texto já preenchido, é só escolher o contato e enviar.</div>
+    <div class="foot"><span><b>ContratoFree</b> — Compartilhar</span><span>08</span></div>
+  </section>
+
+  <!-- 9 · TELAS -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">09</div>
+    </div>
+    <div class="eyebrow">Telas</div>
+    <h2 class="big-title">12 páginas no ar</h2>
+    <div class="pages-grid">
+      <div class="page-chip"><b>Home</b><span>/ — landing + preços</span></div>
+      <div class="page-chip"><b>Login</b><span>/login</span></div>
+      <div class="page-chip"><b>Dashboard</b><span>/dashboard</span></div>
+      <div class="page-chip"><b>Novo contrato</b><span>/novo-contrato</span></div>
+      <div class="page-chip"><b>Clientes</b><span>/clientes</span></div>
+      <div class="page-chip"><b>Perfil</b><span>/perfil</span></div>
+      <div class="page-chip pub"><b>Assinar (pública)</b><span>/assinar/:id — sem login</span></div>
+      <div class="page-chip"><b>Esqueci a senha</b><span>/esqueci-senha</span></div>
+      <div class="page-chip"><b>Redefinir senha</b><span>/redefinir-senha</span></div>
+      <div class="page-chip"><b>Termos de uso</b><span>/termos</span></div>
+      <div class="page-chip"><b>Privacidade</b><span>/privacidade</span></div>
+      <div class="page-chip"><b>404</b><span>/ — página não encontrada</span></div>
+    </div>
+    <div class="note"><b>Protegidas por rota:</b> dashboard, novo contrato, clientes e perfil exigem sessão ativa — com verificação de sessão expirada e redirecionamento automático.</div>
+    <div class="foot"><span><b>ContratoFree</b> — Telas</span><span>09</span></div>
+  </section>
+
+  <!-- 10 · REQUISITOS -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">10</div>
+    </div>
+    <div class="eyebrow">Trabalho final — Front-end Frameworks</div>
+    <h2 class="big-title">Requisitos atendidos</h2>
+    <div class="req">
+      <div class="req-col">
+        <h3>Obrigatórios</h3>
+        <div class="req-item"><span class="ok">✓</span><span><b>React.js + TypeScript via Vite</b> — projeto inteiro em TS, build com <b>tsc -b</b>.</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>Mín. 8 componentes funcionais</b> — tem <b>15</b> (Button, Input, Modal, Header, Sidebar, ContractPreview…).</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>Mín. 5 páginas</b> — são <b>12</b> rotas com React Router.</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>Mín. 4 hooks</b> — useState, useEffect, useContext, useRef, useCallback + <b>4 custom hooks</b> (useContracts, useClients, useLocalStorage, useConsultaCnpjCep).</span></div>
+      </div>
+      <div class="req-col">
+        <h3>Extras e entrega</h3>
+        <div class="req-item"><span class="ok">★</span><span><b>Backend próprio (+1,0):</b> API REST em Node.js com PostgreSQL no Neon — endpoints de contratos, clientes, perfil e assinatura.</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>GitHub:</b> código-fonte + README com instalação, componentes por membro e prints das telas.</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>Deploy:</b> site publicado na Vercel — demonstração ao vivo de 15 min.</span></div>
+        <div class="req-item"><span class="ok">✓</span><span><b>Temas e prazo:</b> tema informado até 21/10 — projeto entregue até <b>18/11</b>.</span></div>
+      </div>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — Requisitos</span><span>10</span></div>
+  </section>
+
+  <!-- 11 · COMO FOI FEITO -->
+  <section class="slide">
+    <div class="brand">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">11</div>
+    </div>
+    <div class="eyebrow">Por dentro do código</div>
+    <h2 class="big-title">Como foi feito</h2>
+    <div class="stack">
+      <div class="s"><b>React 19 + TS</b><span>SPA com Router</span></div>
+      <div class="s"><b>Vite 8</b><span>build + dev server</span></div>
+      <div class="s"><b>Node.js + Express</b><span>API REST</span></div>
+      <div class="s"><b>PostgreSQL (Neon)</b><span>banco em nuvem</span></div>
+      <div class="s"><b>Neon Auth</b><span>login + sessões</span></div>
+      <div class="s"><b>jsPDF</b><span>exportação do PDF</span></div>
+      <div class="s"><b>BrasilAPI</b><span>CNPJ e CEP</span></div>
+      <div class="s"><b>Vercel</b><span>deploy + funções</span></div>
+    </div>
+    <div class="two" style="margin-top:20px;">
+      <div class="card">
+        <h3>Como as partes se conectam</h3>
+        <ul>
+          <li><b>Navegador</b> → consome a API e desenha a prévia ao vivo.</li>
+          <li><b>Servidor</b> → valida, persiste e calcula o hash na assinatura.</li>
+          <li><b>Banco</b> → contratos, clientes e perfis com sessão por usuário.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Detalhes técnicos</h3>
+        <ul>
+          <li>Camada <b>api.ts</b> isolada: modo real ou mock sem mudar a UI.</li>
+          <li>Hash canônico <b>SHA-256</b> idêntico no servidor e no modo mock.</li>
+          <li>Schema aditivo idempotente a cada cold start do servidor.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="links-bar">
+      <div class="link-pill"><b>Site no ar</b><span class="u-site">contratofree.vercel.app</span></div>
+      <div class="link-pill"><b>Código-fonte</b><span class="u-repo">github.com/nick261161/contrato-free</span></div>
+    </div>
+    <div class="foot"><span><b>ContratoFree</b> — Como foi feito</span><span>11</span></div>
+  </section>
+
+  <!-- 12 · CONCLUSÃO -->
+  <section class="slide s12">
+    <div class="brand" style="position:absolute; top:44px; left:64px; right:64px;">
+      <div class="brand__logo"><span class="brand__mark">§</span> Contrato<span class="brand__accent">Free</span></div>
+      <div class="brand__num">12</div>
+    </div>
+    <div class="eyebrow" style="margin-top:0;">Conclusão</div>
+    <h2 class="big-title">Contrato bom é o que <span> sai rápido e protege os dois lados.</span></h2>
+    <p class="lead">Gerar em minutos, assinar pelo link e guardar a prova — sem papel e sem discussão sobre o combinado.</p>
+    <div class="s12-cols">
+      <div class="s12-col"><b>Para o freelancer</b><span>Menos retrabalho,<br>mais projetos fechados.</span></div>
+      <div class="s12-col"><b>Para o cliente</b><span>Clareza antes de assinar,<br>assina em 1 minuto.</span></div>
+      <div class="s12-col"><b>Para o trabalho</b><span>React + TS, API própria,<br>deploy no ar.</span></div>
+    </div>
+    <div class="links-bar" style="width:840px; margin-top:30px;">
+      <div class="link-pill"><b>Teste agora</b><span class="u-site">contratofree.vercel.app</span></div>
+      <div class="link-pill"><b>Código</b><span class="u-repo">github.com/nick261161/contrato-free</span></div>
+    </div>
+    <p style="margin-top:26px; font-size:22px; font-weight:800;">Obrigado! — Dúvidas e sugestões são bem-vindas.</p>
+    <div class="foot"><span><b>ContratoFree</b> — Conclusão</span><span>12</span></div>
+  </section>
+
+</div>
+</body>
+</html>
