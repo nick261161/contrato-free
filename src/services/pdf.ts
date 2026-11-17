@@ -219,7 +219,7 @@ export async function buildContractPdf(
   }
   y += 16
 
-  // Seções dinâmicas (mesma regra do ContractPreview): objeto + termos
+  // Seções dinâmicas (mesma regra do ContractPreview): objetivo + termos
   // padrão sempre; cláusulas-base do nicho e opcionais quando ativas.
   const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
   const opcionais = CLAUSULAS_OPCIONAIS.filter(
@@ -227,7 +227,7 @@ export async function buildContractPdf(
   )
 
   const secoes: Array<{ titulo: string; conteudo: string }> = [
-    { titulo: 'Objeto do contrato', conteudo: contract.descricao },
+    { titulo: 'Objetivo do contrato', conteudo: contract.descricao },
     { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao },
   ]
   if (nichoDef) {

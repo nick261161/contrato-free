@@ -85,7 +85,7 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
       )
     : '—'
 
-  // Seções dinâmicas: objeto + termos padrão sempre; nicho e cláusulas
+  // Seções dinâmicas: objetivo + termos padrão sempre; nicho e cláusulas
   // opcionais entram quando escolhidas — a numeração é recalculada.
   const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
   const opcionais = CLAUSULAS_OPCIONAIS.filter(
@@ -93,7 +93,7 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
   )
 
   const secoes: Array<{ titulo: string; conteudo: string }> = [
-    { titulo: 'Objeto do contrato', conteudo: contract.descricao || '—' },
+    { titulo: 'Objetivo do contrato', conteudo: contract.descricao || '—' },
     { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao || '—' },
   ]
   if (nichoDef) {
