@@ -293,18 +293,34 @@ git push -u origin main
 
 ### Vercel (recomendado)
 
-1. Suba o código para um repositório público no GitHub.
+1. Envie o código para um repositório no GitHub.
 2. Acesse [vercel.com/new](https://vercel.com/new) e importe o repositório.
 3. A Vercel detecta automaticamente o projeto Vite. Mantenha:
    - **Framework preset:** Vite
    - **Build command:** `npm run build`
    - **Output directory:** `dist`
 4. Adicione as variáveis de ambiente em *Settings → Environment Variables*:
-   - `VITE_API_URL` — endereço público da API (`server/`);
-   - `VITE_NEON_AUTH_URL` — URL pública do Neon Auth da branch (a mesma que o
-     `neon deploy` grava como `NEON_AUTH_BASE_URL` no `.env.local`).
-5. Clique em **Deploy**. Como o React Router usa rotas internas, a Vercel já
-   redireciona tudo para `index.html` automaticamente.
+   - `VITE_API_URL=/api` para usar as funções do próprio projeto;
+   - `VITE_NEON_AUTH_URL` com a URL pública do Neon Auth da branch;
+   - `NEON_AUTH_JWKS_URL` com a URL de chaves usada pela API para validar a sessão;
+   - `DATABASE_URL` com a conexão pooled do Neon;
+   - `DATABASE_URL_UNPOOLED` com a conexão direta para atualização do schema.
+5. Clique em **Deploy**. As funções em `api/` atendem às rotas da API, e o
+   `vercel.json` encaminha as demais rotas para o React Router.
+
+As colunas de identidade visual, preferências e condições são criadas pelo
+mesmo inicializador de schema que já atende às funções da Vercel. Para conferir
+a atualização antes de publicar, aponte as variáveis para uma branch de teste do Neon.
+
+### Personalização dos contratos
+
+- Em **Perfil & Termos**, salve sua foto ou logo, dados do prestador e o estilo
+  **Editorial** ou **Botânico**. Defina também área, prazo, valor, pagamento,
+  cláusulas e termos para reaproveitar em novos contratos.
+- Em **Novo contrato**, escolha um modelo de serviço, selecione ou cadastre o
+  cliente e revise escopo, entregáveis e pagamento antes de gerar o PDF.
+- O perfil usado na geração é guardado junto ao novo contrato. Atualizações do
+  perfil passam a valer nos próximos documentos.
 
 ### API (server/) em hospedagem Node (Render, Railway, Fly…)
 

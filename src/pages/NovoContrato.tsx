@@ -17,10 +17,10 @@ import { Sidebar } from '../components/Sidebar'
 import { useClients } from '../hooks/useClients'
 import { useContracts } from '../hooks/useContracts'
 import { useConsultaCnpjCep } from '../hooks/useConsultaCnpjCep'
-import { useLocalStorage } from '../hooks/useLocalStorage'
-import { getContracts, getProfile } from '../services/api'
+import { getContract, getContracts, getProfile } from '../services/api'
 import { apenasDigitos, formatarCEP } from '../services/brasil'
 import { CLAUSULAS_OPCIONAIS, NICHOS, nichoLabel } from '../services/clausulas'
+import { CLAUSULAS_VAZIAS, MODELOS } from '../services/modelos'
 import { downloadContractPdf } from '../services/pdf'
 import type { Clausulas, Contract, FreelancerProfile } from '../types'
 
@@ -32,6 +32,8 @@ interface WizardState {
   clienteCep: string
   clienteEndereco: string
   descricao: string
+  entregaveis: string
+  pagamento: string
   valor: string
   dataInicio: string
   prazoDias: string
@@ -47,11 +49,13 @@ const initialForm: WizardState = {
   clienteCep: '',
   clienteEndereco: '',
   descricao: '',
+  entregaveis: '',
+  pagamento: '',
   valor: '',
   dataInicio: '',
   prazoDias: '30',
   nicho: '',
-  clausulas: { multa: false, nda: false, portfolio: false, rescisao: false },
+  clausulas: CLAUSULAS_VAZIAS,
 }
 
 const steps = [
@@ -66,7 +70,6 @@ export function NovoContrato() {
 
   const { addContract, editContract } = useContracts()
   const { clients, reload: reloadClients } = useClients()
-  const [profile] = useLocalStorage<FreelancerProfile | null>('contratofree.profile', null)
 
   // useState: controla o wizard em 3 etapas e todos os campos do formulário
   const [step, setStep] = useState(1)
@@ -75,12 +78,15 @@ export function NovoContrato() {
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState<Contract | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<FreelancerProfile | null>(null)
+  const [erroPerfil, setErroPerfil] = useState(false)
+  const [erroAcao, setErroAcao] = useState('')
 
   // useState: contrato sendo editado (null = criando novo)
   const [editing, setEditing] = useState<Contract | null>(null)
   const [naoEncontrado, setNaoEncontrado] = useState(false)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
   const [clienteSalvoId, setClienteSalvoId] = useState('')
+  const [modeloId, setModeloId] = useState('')
 
   // useRef: aponta para a div do contrato gerado (usada na impressão/exportação em PDF)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -88,20 +94,39 @@ export function NovoContrato() {
   // useEffect: carrega os termos padrão do freelancer para compor a prévia
   useEffect(() => {
     let ativo = true
+    setErroPerfil(false)
     getProfile()
       .then((dados) => {
-        if (ativo) setPerfilLocal(dados)
+        if (!ativo) return
+        setPerfilLocal(dados)
+        const padroes = dados.padroes
+        if (!routeId && padroes) {
+          setForm((current) => ({
+            ...current,
+            nicho: current.nicho || padroes.nicho,
+            prazoDias: padroes.prazoDias > 0 && current.prazoDias === initialForm.prazoDias
+              ? String(padroes.prazoDias) : current.prazoDias,
+            valor: current.valor || (padroes.valor > 0 ? String(padroes.valor) : ''),
+            pagamento: current.pagamento || padroes.pagamento,
+            clausulas: current.clausulas === initialForm.clausulas ? padroes.clausulas : current.clausulas,
+          }))
+        }
       })
       .catch(() => {
-        if (ativo) setPerfilLocal(profile)
+        if (ativo) setErroPerfil(true)
       })
     return () => {
       ativo = false
     }
-  }, [profile])
+  }, [routeId])
 
   // useEffect: em modo edição, carrega o contrato da URL e preenche o formulário
   useEffect(() => {
+    setNaoEncontrado(false)
+    setStep(1)
+    setForm(initialForm)
+    setModeloId('')
+    setClienteSalvoId('')
     if (!routeId) {
       setEditing(null)
       return
@@ -110,12 +135,11 @@ export function NovoContrato() {
     let ativo = true
     getContracts()
       .then((lista) => {
+        if (!lista.some((contract) => contract.id === routeId)) throw new Error('Contrato não encontrado.')
+        return getContract(routeId)
+      })
+      .then((found) => {
         if (!ativo) return
-        const found = lista.find((c) => c.id === routeId)
-        if (!found) {
-          setNaoEncontrado(true)
-          return
-        }
         setEditing(found)
         setForm({
           titulo: found.titulo,
@@ -125,17 +149,13 @@ export function NovoContrato() {
           clienteCep: '',
           clienteEndereco: found.cliente.endereco,
           descricao: found.descricao,
+          entregaveis: found.entregaveis ?? '',
+          pagamento: found.pagamento ?? '',
           valor: String(found.valor),
           dataInicio: found.dataInicio,
           prazoDias: String(found.prazoDias),
           nicho: found.nicho ?? '',
-          clausulas: {
-            multa: false,
-            nda: false,
-            portfolio: false,
-            rescisao: false,
-            ...found.clausulas,
-          },
+          clausulas: { ...CLAUSULAS_VAZIAS, ...found.clausulas },
         })
         setErrors({})
       })
@@ -148,7 +168,7 @@ export function NovoContrato() {
     }
   }, [routeId])
 
-  const freelancer: FreelancerProfile = perfilLocal ?? {
+  const freelancer: FreelancerProfile = editing?.prestador ?? perfilLocal ?? {
     nome: '',
     email: '',
     telefone: '',
@@ -156,6 +176,8 @@ export function NovoContrato() {
     pix: '',
     termosPadrao: '',
   }
+  const precisaAssinarNovamente = Boolean(editing?.assinaturaPrestador || editing?.assinaturaContratante)
+  const statusNovo = precisaAssinarNovamente ? 'pendente' : editing?.status ?? 'pendente'
 
   const previewContract: Contract = {
     id: editing?.id ?? '',
@@ -170,10 +192,10 @@ export function NovoContrato() {
     dataInicio: form.dataInicio,
     prazoDias: Number(form.prazoDias) || 0,
     descricao: form.descricao,
+    entregaveis: form.entregaveis,
+    pagamento: form.pagamento,
     status: editing?.status ?? 'rascunho',
     criadoEm: editing?.criadoEm ?? new Date().toISOString(),
-    assinaturaPrestador: editing?.assinaturaPrestador,
-    assinaturaContratante: editing?.assinaturaContratante,
     nicho: form.nicho,
     clausulas: form.clausulas,
   }
@@ -183,6 +205,28 @@ export function NovoContrato() {
     setErrors((current) => ({ ...current, [field]: undefined }))
     // editar manualmente os dados do cliente "desvincula" o cliente salvo escolhido
     if (field.startsWith('cliente')) setClienteSalvoId('')
+  }
+
+  function aplicarModelo(value: string) {
+    const modelo = MODELOS.find((item) => item.value === value)
+    if (!modelo) return
+    const anterior = MODELOS.find((item) => item.value === modeloId)
+    const usarCampo = (atual: string, antigo: string | undefined, novo: string) =>
+      !atual.trim() || atual === antigo ? novo : atual
+    setForm((current) => {
+      const usarPrazoModelo = !perfilLocal?.padroes?.prazoDias &&
+        (current.prazoDias === initialForm.prazoDias || current.prazoDias === String(anterior?.prazoDias))
+      return {
+        ...current,
+        titulo: usarCampo(current.titulo, anterior?.label, modelo.label),
+        nicho: modelo.value,
+        descricao: usarCampo(current.descricao, anterior?.descricao, modelo.descricao),
+        entregaveis: usarCampo(current.entregaveis, anterior?.entregaveis, modelo.entregaveis),
+        prazoDias: usarPrazoModelo ? String(modelo.prazoDias) : current.prazoDias,
+      }
+    })
+    setModeloId(value)
+    setErrors({})
   }
 
   // CNPJ/CEP: preenchimento automático pela BrasilAPI — só mexe em campos
@@ -246,11 +290,13 @@ export function NovoContrato() {
 
     if (currentStep === 2) {
       if (!form.descricao.trim()) found.descricao = 'Descreva o escopo do serviço.'
-      if (!form.valor.trim() || Number(form.valor.replace(',', '.')) <= 0)
+      const valor = Number(form.valor.replace(',', '.'))
+      if (!Number.isFinite(valor) || valor <= 0)
         found.valor = 'Informe um valor válido.'
       if (!form.dataInicio) found.dataInicio = 'Escolha a data de início.'
-      if (!form.prazoDias || Number(form.prazoDias) <= 0)
-        found.prazoDias = 'Prazo deve ser maior que zero.'
+      const prazo = Number(form.prazoDias)
+      if (!Number.isInteger(prazo) || prazo < 1 || prazo > 3650)
+        found.prazoDias = 'Informe um número inteiro entre 1 e 3650 dias.'
     }
 
     setErrors(found)
@@ -276,11 +322,14 @@ export function NovoContrato() {
   }
 
   /** Baixa o contrato em PDF (arquivo real, com dados preenchidos). */
-  async function handleDownloadPdf() {
-    if (!sucesso) return
+  async function handleDownloadPdf(contract: Contract) {
     setBaixandoPdf(true)
+    setErroAcao('')
     try {
-      await downloadContractPdf(sucesso)
+      await downloadContractPdf(contract)
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Falha no PDF do contrato', error)
+      setErroAcao('Não foi possível baixar o PDF. Tente novamente.')
     } finally {
       setBaixandoPdf(false)
     }
@@ -288,7 +337,10 @@ export function NovoContrato() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!validate(2)) return
+    if (step !== 3 || salvando || (!perfilLocal && !editing?.prestador)) return
+    setErroAcao('')
+    if (!validate(1)) { setStep(1); return }
+    if (!validate(2)) { setStep(2); return }
 
     const payload = {
       titulo: form.titulo.trim(),
@@ -302,7 +354,11 @@ export function NovoContrato() {
       dataInicio: form.dataInicio,
       prazoDias: Number(form.prazoDias),
       descricao: form.descricao.trim(),
-      status: editing ? editing.status : 'pendente',
+      entregaveis: form.entregaveis.trim(),
+      pagamento: form.pagamento.trim(),
+      status: statusNovo,
+      assinaturaPrestador: undefined,
+      assinaturaContratante: undefined,
       nicho: form.nicho,
       clausulas: form.clausulas,
     }
@@ -315,7 +371,7 @@ export function NovoContrato() {
       setSucesso(saved)
       void reloadClients()
     } catch {
-      setErrors({ titulo: 'Não foi possível salvar o contrato. Tente novamente.' })
+      setErroAcao('Não foi possível salvar o contrato. Tente novamente.')
     } finally {
       setSalvando(false)
     }
@@ -379,6 +435,7 @@ export function NovoContrato() {
             {steps.map((item) => (
               <li
                 key={item.n}
+                aria-current={item.n === step ? 'step' : undefined}
                 className={`wizard-steps__item ${
                   item.n === step ? 'is-active' : item.n < step ? 'is-done' : ''
                 }`}
@@ -397,6 +454,15 @@ export function NovoContrato() {
               {step === 1 && (
                 <section className="panel">
                   <h2>Dados do cliente</h2>
+
+                  {!routeId && (
+                    <div className="wizard-template">
+                      <Select label="Começar com um modelo" name="modelo" value={modeloId}
+                        options={[{ value: '', label: 'Escolher um serviço' }, ...MODELOS]}
+                        onChange={(event) => aplicarModelo(event.target.value)}
+                        hint="Sugere título, escopo e entregáveis editáveis e define a área do serviço." />
+                    </div>
+                  )}
 
                   <Input
                     label="Título do contrato"
@@ -523,6 +589,12 @@ export function NovoContrato() {
                     onChange={(event) => update('descricao', event.target.value)}
                     error={errors.descricao}
                   />
+                  <Textarea label="Entregáveis" name="entregaveis" rows={3} maxLength={3000}
+                    placeholder="Arquivos, formatos e itens incluídos na entrega"
+                    value={form.entregaveis} onChange={(event) => update('entregaveis', event.target.value)} />
+                  <Textarea label="Condições de pagamento" name="pagamento" rows={3} maxLength={1600}
+                    placeholder="Parcelas, vencimentos e forma de pagamento"
+                    value={form.pagamento} onChange={(event) => update('pagamento', event.target.value)} />
                   <div className="grid-2">
                     <Input
                       label="Valor (R$)"
@@ -538,6 +610,7 @@ export function NovoContrato() {
                       type="number"
                       name="prazoDias"
                       min={1}
+                      max={3650}
                       value={form.prazoDias}
                       onChange={(event) => update('prazoDias', event.target.value)}
                       error={errors.prazoDias}
@@ -606,8 +679,8 @@ export function NovoContrato() {
                   <p className="panel__note">
                     {editing ? (
                       <>
-                        As alterações serão salvas no contrato <strong>#{editing.id}</strong>,
-                        mantendo o status atual (<strong>{editing.status}</strong>).
+                        As alterações serão salvas no contrato <strong>#{editing.id}</strong>.
+                        {precisaAssinarNovamente && ' Depois de salvar, o contrato precisará ser assinado novamente.'}
                       </>
                     ) : (
                       <>
@@ -625,10 +698,12 @@ export function NovoContrato() {
                   </p>
 
                   <div className="wizard__actions">
-                    <Button variant="secondary" onClick={handleExport} type="button">
-                      🖨️ Imprimir / Salvar PDF
+                    <Button variant="ghost" onClick={goBack} type="button">Voltar</Button>
+                    <Button variant="secondary" type="button" disabled={baixandoPdf || (!perfilLocal && !editing?.prestador)}
+                      onClick={() => void handleDownloadPdf({ ...previewContract, id: '', prestador: freelancer })}>
+                      {baixandoPdf ? 'Gerando…' : 'Baixar prévia PDF'}
                     </Button>
-                    <Button type="submit" disabled={salvando}>
+                    <Button type="submit" disabled={salvando || (!perfilLocal && !editing?.prestador)}>
                       {salvando
                         ? 'Salvando…'
                         : editing
@@ -636,16 +711,18 @@ export function NovoContrato() {
                           : 'Gerar contrato ✓'}
                     </Button>
                   </div>
+                  {erroPerfil && !editing?.prestador && <p className="alert alert--error" role="alert">Não foi possível carregar o perfil. Recarregue a página para gerar o contrato.</p>}
+                  {!sucesso && erroAcao && <p className="alert alert--error" role="alert">{erroAcao}</p>}
                 </section>
               )}
 
               {step < 3 && (
                 <div className="wizard__actions">
                   <Button variant="ghost" onClick={goBack} type="button" disabled={step === 1}>
-                    ← Voltar
+                    Voltar
                   </Button>
-                  <Button onClick={goNext} type="button">
-                    Continuar →
+                  <Button onClick={goNext} type="button" disabled={Boolean(routeId && editing?.id !== routeId)}>
+                    Continuar
                   </Button>
                 </div>
               )}
@@ -662,19 +739,19 @@ export function NovoContrato() {
       <Modal
         open={sucesso !== null}
         title={editing ? 'Contrato atualizado! ✅' : 'Contrato gerado com sucesso! 🎉'}
-        onClose={() => setSucesso(null)}
+        onClose={() => { setSucesso(null); setErroAcao('') }}
         footer={
           <>
             <Button
               variant="secondary"
-              onClick={() => void handleDownloadPdf()}
+              onClick={() => { if (sucesso) void handleDownloadPdf(sucesso) }}
               type="button"
               disabled={baixandoPdf}
             >
-              {baixandoPdf ? 'Gerando…' : '⬇️ Baixar PDF'}
+              {baixandoPdf ? 'Gerando…' : 'Baixar PDF'}
             </Button>
             <Button variant="secondary" onClick={handleExport} type="button">
-              🖨️ Imprimir / PDF
+              Imprimir
             </Button>
             <Button
               onClick={() => {
@@ -693,6 +770,7 @@ export function NovoContrato() {
           </>
         }
       >
+        {erroAcao && <p className="alert alert--error" role="alert">{erroAcao}</p>}
         <p>
           O contrato <strong>{sucesso?.titulo}</strong> ({sucesso?.id}) foi{' '}
           {editing ? 'atualizado' : 'salvo'} para{' '}

@@ -232,6 +232,12 @@ let mockContracts: Contract[] = migrateContracts(loadLocal(CONTRACTS_KEY, seedCo
 let mockClients: SavedClient[] = loadLocal(CLIENTS_KEY, seedClients)
 let mockProfile: FreelancerProfile = loadLocal(PROFILE_KEY, seedProfile)
 
+function mockProfileSnapshot(): FreelancerProfile {
+  const snapshot = { ...mockProfile }
+  delete snapshot.padroes
+  return snapshot
+}
+
 function commitContracts(): void {
   persistLocal(CONTRACTS_KEY, mockContracts)
 }
@@ -275,7 +281,7 @@ export async function getContract(id: string): Promise<Contract> {
   if (isMockMode) {
     const found = mockContracts.find((c) => c.id === id)
     if (!found) throw new Error('Contrato não encontrado.')
-    return delay(found, 400)
+    return delay({ ...found, prestador: found.prestador ?? mockProfileSnapshot() }, 400)
   }
   return request<Contract>(`/contracts/${id}`)
 }
@@ -284,6 +290,7 @@ export async function createContract(payload: Omit<Contract, 'id' | 'criadoEm'>)
   if (isMockMode) {
     const created: Contract = {
       ...payload,
+      prestador: mockProfileSnapshot(),
       id: `ctr-${Date.now()}`,
       criadoEm: new Date().toISOString(),
     }

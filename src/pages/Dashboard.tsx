@@ -11,7 +11,7 @@ import { ShareLink } from '../components/ShareLink'
 import { Sidebar } from '../components/Sidebar'
 import { SignaturePad } from '../components/SignaturePad'
 import { useContracts } from '../hooks/useContracts'
-import { getProfile } from '../services/api'
+import { getContract, getProfile } from '../services/api'
 import { downloadContractPdf } from '../services/pdf'
 import type { Contract, SignRole } from '../types'
 import { STATUS_LABEL } from '../types'
@@ -37,6 +37,7 @@ export function Dashboard() {
   const [assinandoSalvando, setAssinandoSalvando] = useState(false)
   const [erroAssinatura, setErroAssinatura] = useState<string | null>(null)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
+  const [erroPdf, setErroPdf] = useState('')
 
   // useEffect: carrega o nome do prestador (para sugerir na assinatura)
   useEffect(() => {
@@ -143,8 +144,12 @@ export function Dashboard() {
   async function handleDownloadPdf() {
     if (!selected) return
     setBaixandoPdf(true)
+    setErroPdf('')
     try {
-      await downloadContractPdf(selected)
+      await downloadContractPdf(await getContract(selected.id))
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Falha no PDF do contrato', error)
+      setErroPdf('Não foi possível baixar o PDF. Tente novamente.')
     } finally {
       setBaixandoPdf(false)
     }
@@ -220,7 +225,7 @@ export function Dashboard() {
       <Modal
         open={selected !== null}
         title="Detalhes do contrato"
-        onClose={() => setSelected(null)}
+        onClose={() => { setSelected(null); setErroPdf('') }}
         footerStart={
           <Button
             variant="danger"
@@ -255,6 +260,7 @@ export function Dashboard() {
           </>
         }
       >
+        {erroPdf && <p className="alert alert--error" role="alert">{erroPdf}</p>}
         {selected && (
           <div className="contract-detail">
             <div className="contract-detail__row">

@@ -1,389 +1,258 @@
-/**
- * Geração do PDF do contrato (download real do arquivo).
- *
- * Usa jsPDF para montar o documento em texto (A4) e anexa as assinaturas
- * desenhadas (dataURL) de cada parte — prestador e contratante — cada uma
- * sobre a sua linha, com carimbo de data/hora.
- */
-import type { jsPDF } from 'jspdf'
 import type { Contract, FreelancerProfile } from '../types'
-import { getProfile } from './api'
-import { CLAUSULAS_OPCIONAIS, NICHOS } from './clausulas'
+import { contractSections, contractSummary, documentTheme } from './contractDocument'
 
-const M = 18 // margem em mm
-const W = 210
-const RIGHT = W - M
-const CW = RIGHT - M // largura útil
+const MARGIN = 18
+const RIGHT = 192
+const WIDTH = RIGHT - MARGIN
+const INK = '#1c1830'
+const MUTED = '#555267'
+const LINE = '#e2dfea'
+const GREEN = '#21654e'
 
-/** Perfil vazio de fallback para quando não há dados do prestador. */
-const PERFIL_VAZIO: FreelancerProfile = {
-  nome: '',
-  email: '',
-  telefone: '',
-  profissao: '',
-  pix: '',
-  termosPadrao: '',
+const emptyProfile: FreelancerProfile = {
+  nome: '', email: '', telefone: '', profissao: '', pix: '', termosPadrao: '',
 }
 
-const INDIGO: [number, number, number] = [79, 70, 229]
-const DARK: [number, number, number] = [28, 32, 51]
-const SOFT: [number, number, number] = [92, 97, 120]
-const BORDER: [number, number, number] = [200, 203, 218]
-const GREEN: [number, number, number] = [5, 150, 105]
-
-function brDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR')
-}
-
-function brDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR')
-}
-
-/** Lê as dimensões de um PNG em dataURL para escalar a assinatura. */
-function pngSize(dataUrl: string): { w: number; h: number } {
-  try {
-    const bin = atob(dataUrl.split(',')[1] ?? '')
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    const view = new DataView(bytes.buffer)
-    return { w: view.getUint32(16), h: view.getUint32(20) }
-  } catch {
-    return { w: 440, h: 170 }
-  }
-}
-
-/** Monta o PDF do contrato (não baixa — retorna o documento). */
 export async function buildContractPdf(
   contract: Contract,
   profile: FreelancerProfile,
-): Promise<jsPDF> {
-  // jsPDF carregado sob demanda para não pesar o bundle inicial
-  const { jsPDF: JsPdf } = await import('jspdf')
-  const doc = new JsPdf({ unit: 'mm', format: 'a4' })
-  let y = M
+  signingUrl?: string,
+) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
+  const theme = documentTheme(profile)
+  const supplier = profile.nome || 'Prestador'
+  const brand = profile.marca || supplier
+  const client = contract.cliente.nome || 'Contratante'
+  const signatures = Number(Boolean(contract.assinaturaPrestador)) + Number(Boolean(contract.assinaturaContratante))
+  const title = contract.titulo || 'Contrato de prestação de serviços'
+  let y = 21
+
+  doc.setProperties({ title, subject: 'Contrato de prestação de serviços', author: brand, creator: 'ContratoFree' })
+
+  function font(size: number, weight = 'normal', color = INK, family = 'helvetica') {
+    doc.setFont(family, weight)
+    doc.setFontSize(size)
+    doc.setTextColor(color)
+  }
 
   function ensure(height: number) {
-    if (y + height > 297 - M) {
-      doc.addPage()
-      y = M
+    if (y + height <= 275) return
+    doc.addPage()
+    doc.setFillColor(theme.color)
+    doc.rect(0, 0, 210, 3, 'F')
+    font(8, 'bold', theme.color)
+    doc.text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', MARGIN, 16)
+    y = 26
+  }
+
+  function lines(text: string, width = WIDTH): string[] {
+    return doc.splitTextToSize(text, width)
+  }
+
+  function paragraph(text: string) {
+    font(10.5)
+    for (const line of lines(text)) {
+      ensure(5.4)
+      font(10.5)
+      doc.text(line, MARGIN, y)
+      y += 5.4
+    }
+    y += 5
+  }
+
+  function section(heading: string, number: number, height = 20) {
+    ensure(height)
+    doc.setDrawColor(LINE)
+    doc.line(MARGIN, y - 5, RIGHT, y - 5)
+    font(9, 'bold', theme.color)
+    doc.text(String(number).padStart(2, '0'), MARGIN, y + 1)
+    font(12, 'bold')
+    doc.text(heading, MARGIN + 11, y + 1)
+    y += 10
+  }
+
+  function image(data: string, x: number, top: number, width: number, height: number) {
+    try {
+      const properties = doc.getImageProperties(data)
+      const scale = Math.min(width / properties.width, height / properties.height)
+      const w = properties.width * scale
+      const h = properties.height * scale
+      doc.addImage(data, properties.fileType, x + (width - w) / 2, top + (height - h) / 2, w, h)
+    } catch {
+      // Uma imagem opcional corrompida não impede a exportação do texto.
     }
   }
 
-  function rule() {
-    doc.setDrawColor(...BORDER)
-    doc.setLineWidth(0.3)
-    doc.line(M, y, RIGHT, y)
-    y += 6
+  doc.setFillColor(theme.color)
+  doc.rect(0, 0, 210, 4, 'F')
+  doc.setFillColor(theme.tint)
+  doc.roundedRect(MARGIN, 14, WIDTH, 36, 3, 3, 'F')
+
+  const brandX = profile.imagem ? MARGIN + 34 : MARGIN + 8
+  if (profile.imagem) {
+    doc.setFillColor('#ffffff')
+    doc.roundedRect(MARGIN + 6, 21, 22, 22, 2, 2, 'F')
+    image(profile.imagem, MARGIN + 8, 23, 18, 18)
   }
+  font(9, 'bold', theme.color)
+  doc.text('PRESTAÇÃO DE SERVIÇOS', brandX, 26)
+  font(13, 'bold')
+  doc.text(lines(brand, RIGHT - brandX - 8).slice(0, 2), brandX, 34, { lineHeightFactor: 1.05 })
 
-  function sectionTitle(title: string) {
-    ensure(16)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...DARK)
-    doc.text(title, M, y)
-    y += 6
+  font(8.5, 'bold', signatures === 2 ? GREEN : theme.color)
+  doc.text(['AGUARDANDO ASSINATURAS', 'ASSINATURA PARCIAL · 1 DE 2', 'ASSINADO · 2 DE 2'][signatures], MARGIN, 60)
+  font(8.5, 'normal', MUTED)
+  doc.text(new Date(contract.criadoEm).toLocaleDateString('pt-BR'), RIGHT, 60, { align: 'right' })
+
+  y = 75
+  font(28, 'normal', INK, 'times')
+  for (const line of lines(title)) {
+    ensure(11)
+    font(28, 'normal', INK, 'times')
+    doc.text(line, MARGIN, y)
+    y += 11
   }
-
-  function paragraph(content: string, size = 9.5) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(size)
-    doc.setTextColor(...DARK)
-    const lines: string[] = doc.splitTextToSize(content || '—', CW)
-    for (const line of lines) {
-      ensure(6)
-      doc.text(line, M, y)
-      y += 5
-    }
-    y += 2
-  }
-
-  function party(x: number, width: number, heading: string, name: string, details: string[]): number {
-    let cy = y
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...INDIGO)
-    doc.text(heading.toUpperCase(), x, cy)
-    cy += 5
-
-    doc.setFontSize(11)
-    doc.setTextColor(...DARK)
-    for (const line of doc.splitTextToSize(name || '—', width)) {
-      doc.text(line, x, cy)
-      cy += 5
-    }
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(...SOFT)
-    for (const detail of details) {
-      for (const line of doc.splitTextToSize(detail || '—', width)) {
-        doc.text(line, x, cy)
-        cy += 4.5
-      }
-    }
-    return cy
-  }
-
-  // ---------------------------------------------------------------- cabeçalho
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(15)
-  doc.setTextColor(...INDIGO)
-  doc.text('§ ContratoFree', M, y)
-  doc.setFontSize(9)
-  doc.setTextColor(...SOFT)
-  doc.text(`#${contract.id}`, RIGHT, y, { align: 'right' })
-  y += 4
-  rule()
-
-  const temPrestador = Boolean(contract.assinaturaPrestador)
-  const temCliente = Boolean(contract.assinaturaContratante)
-  const completo = temPrestador && temCliente
-  const parcial = temPrestador || temCliente
-
-  const statusLabel = completo
-    ? 'ASSINADO (PRESTADOR + CONTRATANTE)'
-    : parcial
-      ? `ASSINATURA PARCIAL (${(temPrestador ? 1 : 0) + (temCliente ? 1 : 0)} DE 2)`
-      : 'AGUARDANDO ASSINATURA'
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...(completo ? GREEN : parcial ? INDIGO : SOFT))
-  doc.text(`STATUS: ${statusLabel}`, M, y)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...SOFT)
-  doc.text(`Emitido em ${brDate(contract.criadoEm)}`, RIGHT, y, { align: 'right' })
-  y += 10
-
-  // ------------------------------------------------------------------- título
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(17)
-  doc.setTextColor(...DARK)
-  const titleLines: string[] = doc.splitTextToSize(contract.titulo || 'Sem título', CW)
-  for (const line of titleLines) {
-    ensure(9)
-    doc.text(line, W / 2, y, { align: 'center' })
-    y += 8
-  }
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9.5)
-  doc.setTextColor(...SOFT)
-  doc.text(
-    `Contrato de prestação de serviços entre ${profile.nome || '—'} e ${contract.cliente.nome || '—'}.`,
-    W / 2,
-    y,
-    { align: 'center' },
-  )
-  y += 10
-
-  // -------------------------------------------------------------------- partes
-  ensure(56)
-  const colW = (CW - 8) / 2
-  const endA = party(M, colW, 'Prestador', profile.nome, [
-    profile.profissao,
-    profile.email,
-    profile.telefone,
-  ])
-  const endB = party(M + colW + 8, colW, 'Contratante', contract.cliente.nome, [
-    contract.cliente.cpfCnpj,
-    contract.cliente.email,
-    contract.cliente.endereco,
-  ])
-  y = Math.max(endA, endB) + 6
-
-  // --------------------------------------------------------------- condições
-  ensure(30)
-  const cellW = (CW - 16) / 3
-  const cells: Array<[string, string]> = [
-    ['Valor total', contract.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })],
-    ['Início', contract.dataInicio ? brDate(`${contract.dataInicio}T00:00:00`) : '—'],
-    ['Entrega prevista', contract.dataInicio
-      ? brDate(
-          new Date(
-            new Date(`${contract.dataInicio}T00:00:00`).getTime() +
-              contract.prazoDias * 86_400_000,
-          ).toISOString(),
-        )
-      : '—'],
-  ]
-  let cx = M
-  for (const [label, value] of cells) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...SOFT)
-    doc.text(label.toUpperCase(), cx, y)
-    doc.setFontSize(10.5)
-    doc.setTextColor(...DARK)
-    doc.text(value, cx, y + 6)
-    cx += cellW + 8
-  }
-  y += 16
-
-  // Seções dinâmicas (mesma regra do ContractPreview): objetivo + termos
-  // padrão sempre; cláusulas-base do nicho e opcionais quando ativas.
-  const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
-  const opcionais = CLAUSULAS_OPCIONAIS.filter(
-    (item) => contract.clausulas?.[item.chave],
-  )
-
-  const secoes: Array<{ titulo: string; conteudo: string }> = [
-    { titulo: 'Objetivo do contrato', conteudo: contract.descricao },
-    { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao },
-  ]
-  if (nichoDef) {
-    secoes.push({
-      titulo: `Cláusulas-base — ${nichoDef.label}`,
-      conteudo: nichoDef.clausulas.join(' '),
-    })
-  }
-  for (const item of opcionais) {
-    secoes.push({ titulo: item.titulo, conteudo: item.texto })
-  }
-
-  secoes.forEach((secao, index) => {
-    sectionTitle(`${index + 1}. ${secao.titulo}`)
-    paragraph(secao.conteudo)
-  })
-
-  // -------------------------------------------------------------- assinaturas
-  sectionTitle(`${secoes.length + 1}. Assinaturas`)
-
-  const signW = (CW - 10) / 2
-  const areaH = 26 // altura reservada para o desenho/nome digitado (mm)
-  ensure(areaH + 32)
-  const lineY = y + areaH
+  y += 3
 
   const cols = [
-    {
-      x: M,
-      sig: contract.assinaturaPrestador,
-      nome: profile.nome || 'Prestador',
-      papel: 'Prestador',
-    },
-    {
-      x: M + signW + 10,
-      sig: contract.assinaturaContratante,
-      nome: contract.cliente.nome || 'Contratante',
-      papel: 'Contratante',
-    },
+    { role: 'Prestador', name: supplier, details: [profile.profissao, profile.documento, profile.email, profile.telefone, profile.endereco], sign: contract.assinaturaPrestador },
+    { role: 'Contratante', name: client, details: [contract.cliente.cpfCnpj, contract.cliente.email, contract.cliente.endereco], sign: contract.assinaturaContratante },
   ]
+  const cardWidth = (WIDTH - 6) / 2
+  const parties = cols.map((party) => {
+    font(11, 'bold')
+    const nameLines = lines(party.name, cardWidth - 12)
+    font(9.5, 'normal', MUTED)
+    const details = party.details.flatMap((item) => item ? lines(item, cardWidth - 12) : [])
+    return { ...party, nameLines, details }
+  })
+  const partyHeight = Math.max(...parties.map((party) => 19 + party.nameLines.length * 5 + party.details.length * 4.5))
 
-  for (const col of cols) {
-    // desenho ou nome digitado — encostado por cima da linha
-    if (col.sig?.imagem) {
-      const size = pngSize(col.sig.imagem)
-      const scale = Math.min(46 / size.w, (areaH - 6) / size.h)
-      const imgW = size.w * scale
-      const imgH = size.h * scale
-      doc.addImage(
-        col.sig.imagem,
-        'PNG',
-        col.x + (signW - imgW) / 2,
-        lineY - 3 - imgH,
-        imgW,
-        imgH,
-      )
-    } else if (col.sig) {
-      doc.setFont('helvetica', 'oblique')
-      doc.setFontSize(15)
-      doc.setTextColor(...DARK)
-      const nomeLines: string[] = doc.splitTextToSize(col.sig.por, signW - 6)
-      let ny = lineY - 5
-      for (const line of nomeLines) {
-        doc.text(line, col.x + 3, ny)
-        ny -= 6
-      }
-    } else {
-      doc.setFont('helvetica', 'oblique')
-      doc.setFontSize(8.5)
-      doc.setTextColor(...SOFT)
-      doc.text(
-        `${col.papel} — aguardando assinatura`,
-        col.x + signW / 2,
-        lineY - 6,
-        { align: 'center' },
-      )
+  if (partyHeight > 105) {
+    for (const party of parties) {
+      ensure(17)
+      font(9, 'bold', theme.color)
+      doc.text(party.role.toUpperCase(), MARGIN, y)
+      y += 6
+      paragraph([party.name, ...party.details].join('\n'))
     }
-
-    // a linha "do contrato" + nome da parte embaixo
-    doc.setDrawColor(...SOFT)
-    doc.setLineWidth(0.3)
-    doc.line(col.x, lineY, col.x + signW, lineY)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9.5)
-    doc.setTextColor(...DARK)
-    doc.text(col.nome, col.x + signW / 2, lineY + 5, { align: 'center' })
-
-    // carimbo (quem assinou + data/hora) ou aviso de pendência
-    doc.setFontSize(7.5)
-    const stamp = col.sig
-      ? `Assinado por ${col.sig.por} em ${brDateTime(col.sig.em)}`
-      : 'Aguardando assinatura'
-    doc.setTextColor(...(col.sig ? GREEN : SOFT))
-    let sy = lineY + 11
-    for (const line of doc.splitTextToSize(stamp, signW)) {
-      doc.text(line, col.x + signW / 2, sy, { align: 'center' })
-      sy += 4
-    }
-
-    // integridade: hash SHA-256 do conteúdo + IP (registrados na assinatura)
-    if (col.sig?.hash) {
-      doc.setFontSize(6.5)
-      doc.setTextColor(...SOFT)
-      const integridade = `SHA-256: ${col.sig.hash}${
-        col.sig.ip ? ` · IP: ${col.sig.ip}` : ''
-      }`
-      for (const line of doc.splitTextToSize(integridade, signW)) {
-        doc.text(line, col.x + signW / 2, sy + 1, { align: 'center' })
-        sy += 3.5
-      }
-    }
-    y = Math.max(y, sy + 6)
+  } else {
+    ensure(partyHeight)
+    parties.forEach((party, index) => {
+      const x = MARGIN + index * (cardWidth + 6)
+      doc.setDrawColor(LINE)
+      doc.roundedRect(x, y, cardWidth, partyHeight, 2, 2, 'S')
+      font(8.5, 'bold', theme.color)
+      doc.text(party.role.toUpperCase(), x + 6, y + 7)
+      font(11, 'bold')
+      party.nameLines.forEach((line, i) => doc.text(line, x + 6, y + 14 + i * 5))
+      font(9.5, 'normal', MUTED)
+      party.details.forEach((line, i) => doc.text(line, x + 6, y + 15 + party.nameLines.length * 5 + i * 4.5))
+    })
+    y += partyHeight + 8
   }
 
-  if (!temCliente) {
-    doc.setFontSize(8)
-    doc.setTextColor(...INDIGO)
-    doc.text(
-      `Link para assinatura do cliente: ${window.location.origin}/assinar/${contract.id}`,
-      M,
-      y,
-    )
+  const summary = contractSummary(contract)
+  const summaryWidth = WIDTH / summary.length
+  font(11, 'bold')
+  const values = summary.map(({ value }) => lines(value, summaryWidth - 14))
+  const summaryHeight = 16 + Math.max(...values.map((value) => value.length)) * 5
+  ensure(summaryHeight)
+  doc.setFillColor(theme.tint)
+  doc.roundedRect(MARGIN, y, WIDTH, summaryHeight, 2, 2, 'F')
+  summary.forEach(({ label }, index) => {
+    const x = MARGIN + 7 + index * summaryWidth
+    font(8.5, 'bold', theme.color)
+    doc.text(label.toUpperCase(), x, y + 8)
+    font(11, 'bold')
+    values[index].forEach((line, i) => doc.text(line, x, y + 15 + i * 5))
+  })
+  y += summaryHeight + 12
+
+  const sections = contractSections(contract, profile)
+  sections.forEach(({ titulo, conteudo }, index) => {
+    section(titulo, index + 1)
+    paragraph(conteudo ?? '')
+  })
+  section('Assinaturas', sections.length + 1, 61)
+
+  const signatureY = y
+  const signArea = 22
+  const signLine = signatureY + signArea
+  const signaturesText = cols.map(({ role, name, sign }) => {
+    font(10, 'bold')
+    const nameLines = lines(name, cardWidth - 8)
+    font(8, 'normal', MUTED)
+    const stamp = sign ? 'Assinado por ' + sign.por + ' em ' + new Date(sign.em).toLocaleString('pt-BR') : 'Aguardando assinatura'
+    const details = [stamp, sign?.hash ? 'SHA-256: ' + sign.hash : '', sign?.ip ? 'IP: ' + sign.ip : ''].filter(Boolean)
+    return { role, sign, nameLines, details: details.flatMap((detail) => lines(detail, cardWidth - 8)) }
+  })
+
+  signaturesText.forEach(({ role, sign }, index) => {
+    const x = MARGIN + index * (cardWidth + 6)
+    if (sign?.imagem) {
+      image(sign.imagem, x + 10, signatureY, cardWidth - 20, signArea - 2)
+    } else if (sign) {
+      font(14, 'italic', INK, 'times')
+      const typed = lines(sign.por, cardWidth - 10).slice(0, 2)
+      doc.text(typed, x + cardWidth / 2, signLine - 3 - (typed.length - 1) * 5, { align: 'center' })
+    }
+    doc.setDrawColor(LINE)
+    doc.line(x, signLine, x + cardWidth, signLine)
+    font(8.5, 'bold', theme.color)
+    doc.text(role.toUpperCase(), x + 4, signLine + 6)
+  })
+
+  y = signLine + 12
+  const signatureRows = signaturesText.map(({ nameLines, details, sign }) => [
+    ...nameLines.map((text) => ({ text, size: 10, weight: 'bold', color: INK })),
+    ...details.map((text) => ({ text, size: 8, weight: 'normal', color: sign ? GREEN : MUTED })),
+  ])
+  const rowCount = Math.max(...signatureRows.map((rows) => rows.length))
+  for (let index = 0; index < rowCount; index++) {
+    ensure(5)
+    signatureRows.forEach((rows, col) => {
+      const row = rows[index]
+      if (!row) return
+      font(row.size, row.weight, row.color)
+      doc.text(row.text, MARGIN + 4 + col * (cardWidth + 6), y)
+    })
+    y += 4.6
+  }
+
+  if (!contract.assinaturaContratante && signingUrl) {
     y += 6
+    ensure(9)
+    font(9, 'bold', theme.color)
+    doc.textWithLink('Abrir link de assinatura do cliente', MARGIN, y, { url: signingUrl })
   }
 
-  // ----------------------------------------------------------------- rodapé
-  ensure(14)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...SOFT)
-  doc.text(
-    `Documento gerado automaticamente pela plataforma ContratoFree em ${brDate(new Date().toISOString())}.`,
-    W / 2,
-    y,
-    { align: 'center' },
-  )
-
+  const pages = doc.getNumberOfPages()
+  for (let page = 1; page <= pages; page++) {
+    doc.setPage(page)
+    doc.setDrawColor(LINE)
+    doc.line(MARGIN, 281, RIGHT, 281)
+    font(8, 'normal', MUTED)
+    doc.text(contract.id ? 'ContratoFree  ·  ' + contract.id : 'ContratoFree  ·  Prévia', MARGIN, 287)
+    doc.text(page + ' / ' + pages, RIGHT, 287, { align: 'right' })
+  }
   return doc
 }
 
-/** Gera e baixa o PDF do contrato (com assinatura, quando houver). */
 export async function downloadContractPdf(contract: Contract): Promise<void> {
-  // Contrato vindo da busca pública por id já traz o perfil do prestador
-  // embutido (página de assinatura, sem login); nos fluxos logados, busca
-  // o perfil da conta atual. Sem perfil disponível, o PDF usa campos vazios.
-  const profile =
-    contract.prestador ?? (await getProfile().catch(() => PERFIL_VAZIO))
-  const doc = await buildContractPdf(contract, profile)
-
-  const slug = (contract.titulo || 'contrato')
+  const profile = contract.prestador ?? await import('./api').then(({ getProfile }) => getProfile()).catch(() => emptyProfile)
+  const signingUrl = contract.id
+    ? new URL('/assinar/' + encodeURIComponent(contract.id), window.location.origin).href
+    : undefined
+  const doc = await buildContractPdf(contract, profile, signingUrl)
+  const slug = contract.titulo
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
     .slice(0, 40)
-
-  const completo = Boolean(contract.assinaturaPrestador && contract.assinaturaContratante)
-  doc.save(`contrato-${slug || 'sem-titulo'}${completo ? '-assinado' : ''}.pdf`)
+    .replace(/^-+|-+$/g, '')
+  const signed = Boolean(contract.assinaturaPrestador && contract.assinaturaContratante)
+  doc.save('contrato-' + (slug || 'sem-titulo') + (signed ? '-assinado' : '') + '.pdf')
 }

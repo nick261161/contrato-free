@@ -25,6 +25,7 @@ export function Assinar() {
   const [assinante, setAssinante] = useState('')
   const [desenho, setDesenho] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroPdf, setErroPdf] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [baixando, setBaixando] = useState(false)
 
@@ -73,7 +74,7 @@ export function Assinar() {
         imagem: desenho ?? undefined,
         quem: 'contratante',
       })
-      setContract(signed)
+      setContract({ ...signed, prestador: signed.prestador ?? contract.prestador })
       setDesenho(null)
     } catch {
       setErro('Não foi possível registrar a assinatura. Tente novamente.')
@@ -85,8 +86,12 @@ export function Assinar() {
   async function handleDownload() {
     if (!contract) return
     setBaixando(true)
+    setErroPdf('')
     try {
       await downloadContractPdf(contract)
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Falha no PDF do contrato', error)
+      setErroPdf('Não foi possível baixar o PDF. Tente novamente.')
     } finally {
       setBaixando(false)
     }
@@ -156,6 +161,7 @@ export function Assinar() {
 
         <div className="assinar">
           <aside className="assinar__panel">
+            {erroPdf && <p className="alert alert--error" role="alert">{erroPdf}</p>}
             {assinado ? (
               <div className="assinar__done">
                 <h2>
@@ -243,6 +249,9 @@ export function Assinar() {
                   className="assinar__submit"
                 >
                   {salvando ? 'Registrando…' : 'Confirmar assinatura ✓'}
+                </Button>
+                <Button variant="secondary" onClick={() => void handleDownload()} type="button" disabled={baixando}>
+                  {baixando ? 'Gerando…' : 'Baixar PDF'}
                 </Button>
               </div>
             )}

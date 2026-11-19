@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { requerUsuario } from '../auth.js'
 import {
   mapContract,
+  profileSnapshot,
   query,
   upsertCliente,
   withTransaction,
@@ -37,6 +38,8 @@ function parseContrato(body) {
     dataInicio: String(body?.dataInicio ?? ''),
     prazoDias: Math.max(0, Math.round(Number(body?.prazoDias) || 0)),
     descricao: String(body?.descricao ?? ''),
+    pagamento: String(body?.pagamento ?? '').trim().slice(0, 1600),
+    entregaveis: String(body?.entregaveis ?? '').trim().slice(0, 3000),
     status: STATUS_VALIDOS.includes(body?.status) ? body.status : 'rascunho',
     assinaturaPrestador: body?.assinaturaPrestador ?? null,
     assinaturaContratante: body?.assinaturaContratante ?? null,
@@ -75,8 +78,21 @@ function sha256Conteudo(row) {
       rescisao: Boolean(row.clausulas?.rescisao),
     },
     criadoEm: new Date(row.criado_em).toISOString(),
+    ...(row.pagamento && { pagamento: row.pagamento }),
+    ...(row.entregaveis && { entregaveis: row.entregaveis }),
+    ...(row.prestador_snapshot && {
+      prestador: camposPrestador(row.prestador_snapshot),
+    }),
   })
   return createHash('sha256').update(payload).digest('hex')
+}
+
+function camposPrestador(prestador) {
+  return [
+    prestador.nome, prestador.email, prestador.telefone, prestador.profissao,
+    prestador.pix, prestador.termosPadrao, prestador.marca, prestador.documento,
+    prestador.endereco, prestador.imagem, prestador.temaPdf,
+  ]
 }
 
 /** IP do cliente: atrás do proxy da Vercel vale o x-forwarded-for original. */
@@ -93,7 +109,10 @@ contractsRouter.get(
   requerUsuario,
   wrap(async (req, res) => {
     const { rows } = await query(
-      'SELECT * FROM contracts WHERE user_id = $1 ORDER BY criado_em DESC, id DESC',
+      `SELECT id, titulo, cliente, valor, data_inicio, prazo_dias, descricao, status,
+              criado_em, assinatura_prestador, assinatura_contratante, nicho,
+              clausulas, pagamento, entregaveis
+         FROM contracts WHERE user_id = $1 ORDER BY criado_em DESC, id DESC`,
       [req.usuarioId],
     )
     res.json(rows.map(mapContract))
@@ -110,9 +129,7 @@ contractsRouter.get(
   '/:id',
   wrap(async (req, res) => {
     const { rows } = await query(
-      `SELECT c.*, p.nome AS prestador_nome, p.email AS prestador_email,
-              p.telefone AS prestador_telefone, p.profissao AS prestador_profissao,
-              p.pix AS prestador_pix, p.termos_padrao AS prestador_termos
+      `SELECT c.*, to_jsonb(p) AS perfil_atual
          FROM contracts c
          LEFT JOIN profiles p ON p.user_id = c.user_id
         WHERE c.id = $1`,
@@ -122,16 +139,7 @@ contractsRouter.get(
 
     const row = rows[0]
     const contrato = mapContract(row)
-    if (row.prestador_nome != null) {
-      contrato.prestador = {
-        nome: row.prestador_nome,
-        email: row.prestador_email,
-        telefone: row.prestador_telefone,
-        profissao: row.prestador_profissao,
-        pix: row.prestador_pix,
-        termosPadrao: row.prestador_termos,
-      }
-    }
+    contrato.prestador ??= profileSnapshot(row.perfil_atual)
     res.json(contrato)
   }),
 )
@@ -147,11 +155,13 @@ contractsRouter.post(
     const id = `ctr-${Date.now()}-${randomBytes(4).toString('hex')}`
 
     const row = await withTransaction(async (tx) => {
+      const perfil = await tx.query('SELECT * FROM profiles WHERE user_id = $1', [req.usuarioId])
       const { rows } = await tx.query(
         `INSERT INTO contracts
            (id, titulo, cliente, valor, data_inicio, prazo_dias, descricao, status,
-            assinatura_prestador, assinatura_contratante, user_id, nicho, clausulas)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            assinatura_prestador, assinatura_contratante, user_id, nicho, clausulas,
+            pagamento, entregaveis, prestador_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
         [
           id,
@@ -167,6 +177,9 @@ contractsRouter.post(
           req.usuarioId,
           dados.nicho,
           dados.clausulas,
+          dados.pagamento,
+          dados.entregaveis,
+          profileSnapshot(perfil.rows[0]) ?? null,
         ],
       )
       await upsertCliente(
@@ -194,8 +207,9 @@ contractsRouter.put(
             SET titulo = $1, cliente = $2, valor = $3, data_inicio = $4,
                 prazo_dias = $5, descricao = $6, status = $7,
                 assinatura_prestador = $8, assinatura_contratante = $9,
-                nicho = $10, clausulas = $11
-          WHERE id = $12 AND user_id = $13
+                nicho = $10, clausulas = $11,
+                pagamento = COALESCE($12, pagamento), entregaveis = COALESCE($13, entregaveis)
+          WHERE id = $14 AND user_id = $15
           RETURNING *`,
         [
           dados.titulo,
@@ -209,6 +223,8 @@ contractsRouter.put(
           dados.assinaturaContratante,
           dados.nicho,
           dados.clausulas,
+          req.body.pagamento === undefined ? null : dados.pagamento,
+          req.body.entregaveis === undefined ? null : dados.entregaveis,
           req.params.id,
           req.usuarioId,
         ],

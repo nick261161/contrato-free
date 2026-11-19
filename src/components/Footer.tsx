@@ -20,7 +20,7 @@ export function Footer() {
           {/* Levam à Home e rolam até a seção (# no react-router) */}
           <Link to="/#funcionalidades">Funcionalidades</Link>
           <Link to="/#como-funciona">Como funciona</Link>
-          <Link to="/#precos">Preços</Link>
+          <Link to="/#precos">Começar</Link>
         </div>
 
         <div className="footer__col">

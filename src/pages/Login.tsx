@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
@@ -14,7 +14,7 @@ export function Login() {
   const navigate = useNavigate()
 
   // useState: modo (entrar/criar conta) e campos do formulário
-  const [modo, setModo] = useState<Modo>('entrar')
+  const [params, setParams] = useSearchParams()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -37,10 +37,10 @@ export function Login() {
 
   if (user) return <Navigate to="/dashboard" replace />
 
-  const criando = modo === 'criar'
+  const criando = params.get('modo') === 'cadastro'
 
   function trocarModo(novo: Modo) {
-    setModo(novo)
+    setParams(novo === 'criar' ? { modo: 'cadastro' } : {}, { replace: true })
     setErro(null)
   }
 
@@ -88,7 +88,7 @@ export function Login() {
           <h1>{criando ? 'Crie sua conta' : 'Entrar na sua conta'}</h1>
           <p>
             {criando
-              ? 'Cadastro no Neon Auth: use um e-mail e uma senha com 8 ou mais caracteres.'
+              ? 'Crie seu perfil para preparar e compartilhar contratos.'
               : 'Entre com o e-mail e a senha da sua conta.'}
           </p>
 

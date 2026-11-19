@@ -20,6 +20,8 @@ export function Header() {
               Início
             </NavLink>
           )}
+          {!user && <Link to="/#funcionalidades">Funcionalidades</Link>}
+          {!user && <Link to="/#como-funciona">Como funciona</Link>}
           {user && (
             <>
               <NavLink

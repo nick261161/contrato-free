@@ -53,6 +53,8 @@ export interface Contract {
    * quem preparou e os termos sem exigir login.
    */
   prestador?: FreelancerProfile
+  pagamento?: string
+  entregaveis?: string
   /**
    * Nicho de atuação escolhido no wizard (design, dev, social, video,
    * redacao) — define as cláusulas-base do contrato (services/clausulas.ts).
@@ -81,6 +83,20 @@ export interface FreelancerProfile {
   profissao: string
   pix: string
   termosPadrao: string
+  marca?: string
+  documento?: string
+  endereco?: string
+  imagem?: string
+  temaPdf?: 'editorial' | 'botanico'
+  padroes?: ContractDefaults
+}
+
+export interface ContractDefaults {
+  nicho: string
+  prazoDias: number
+  valor: number
+  pagamento: string
+  clausulas: Clausulas
 }
 
 /** Cliente salvo na agenda do freelancer (persistido). */

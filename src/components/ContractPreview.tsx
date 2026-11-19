@@ -1,21 +1,11 @@
-import type { Ref } from 'react'
+import type { CSSProperties, Ref } from 'react'
 import type { Contract, FreelancerProfile, Signature } from '../types'
-import { CLAUSULAS_OPCIONAIS, NICHOS } from '../services/clausulas'
+import { contractSections, contractSummary, documentTheme } from '../services/contractDocument'
 
 interface ContractPreviewProps {
   contract: Contract
   profile: FreelancerProfile
   innerRef?: Ref<HTMLDivElement>
-}
-
-const currency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-})
-
-function formatDate(iso: string): string {
-  if (!iso) return '—'
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR')
 }
 
 interface SignatureSlotProps {
@@ -75,93 +65,42 @@ function SignatureSlot({ signature, nome, papel }: SignatureSlotProps) {
 
 /** Pré-visualização do contrato gerado — também é a área de impressão/exportação em PDF. */
 export function ContractPreview({ contract, profile, innerRef }: ContractPreviewProps) {
-  const inicio = formatDate(contract.dataInicio)
-  const fim = contract.dataInicio
-    ? formatDate(
-        new Date(
-          new Date(`${contract.dataInicio}T00:00:00`).getTime() +
-            contract.prazoDias * 86_400_000,
-        ).toISOString().slice(0, 10),
-      )
-    : '—'
-
-  // Seções dinâmicas: objetivo + termos padrão sempre; nicho e cláusulas
-  // opcionais entram quando escolhidas — a numeração é recalculada.
-  const nichoDef = NICHOS.find((item) => item.value === contract.nicho)
-  const opcionais = CLAUSULAS_OPCIONAIS.filter(
-    (item) => contract.clausulas?.[item.chave],
-  )
-
-  const secoes: Array<{ titulo: string; conteudo: string }> = [
-    { titulo: 'Objetivo do contrato', conteudo: contract.descricao || '—' },
-    { titulo: 'Condições padrão do prestador', conteudo: profile.termosPadrao || '—' },
-  ]
-  if (nichoDef) {
-    secoes.push({
-      titulo: `Cláusulas-base — ${nichoDef.label}`,
-      conteudo: nichoDef.clausulas.join(' '),
-    })
-  }
-  for (const item of opcionais) {
-    secoes.push({ titulo: item.titulo, conteudo: item.texto })
-  }
+  const theme = documentTheme(profile)
+  const secoes = contractSections(contract, profile)
+  const resumo = contractSummary(contract)
+  const prestador = [profile.profissao, profile.documento, profile.email, profile.telefone, profile.endereco]
+  const contratante = [contract.cliente.cpfCnpj, contract.cliente.email, contract.cliente.endereco]
 
   return (
-    <div className="preview" ref={innerRef} id="contract-print">
+    <div className="preview" ref={innerRef} id="contract-print"
+      style={{ '--document-accent': theme.color, '--document-tint': theme.tint } as CSSProperties}>
       <div className="preview__head">
-        <span className="preview__brand">
-          <span className="brand__mark">§</span> ContratoFree
-        </span>
-        <span className="preview__number">
-          {contract.id ? `#${contract.id}` : '#rascunho'}
-        </span>
+        {profile.imagem && <img className="preview__logo" src={profile.imagem} alt="" />}
+        <div className="preview__brand">
+          <span>Contrato de prestação de serviços</span>
+          <strong>{profile.marca || profile.nome || 'ContratoFree'}</strong>
+        </div>
       </div>
 
       <h2 className="preview__title">{contract.titulo || 'Sem título'}</h2>
-      <p className="preview__subtitle">
-        Contrato de prestação de serviços entre{' '}
-        <strong>{profile.nome || '—'}</strong> e{' '}
-        <strong>{contract.cliente.nome || '—'}</strong>.
-      </p>
 
       <div className="preview__grid">
         <div>
           <span>Prestador</span>
           <strong>{profile.nome || '—'}</strong>
-          <p>
-            {profile.profissao || '—'}
-            <br />
-            {profile.email || '—'}
-            <br />
-            {profile.telefone || '—'}
-          </p>
+          <p>{prestador.filter(Boolean).join('\n')}</p>
         </div>
         <div>
           <span>Contratante</span>
           <strong>{contract.cliente.nome || '—'}</strong>
-          <p>
-            {contract.cliente.cpfCnpj || '—'}
-            <br />
-            {contract.cliente.email || '—'}
-            <br />
-            {contract.cliente.endereco || '—'}
-          </p>
+          <p>{contratante.filter(Boolean).join('\n')}</p>
         </div>
       </div>
 
       <div className="preview__row">
-        <div>
-          <span>Valor total</span>
-          <strong>{currency.format(contract.valor || 0)}</strong>
-        </div>
-        <div>
-          <span>Início</span>
-          <strong>{inicio}</strong>
-        </div>
-        <div>
-          <span>Entrega prevista</span>
-          <strong>{fim}</strong>
-        </div>
+        {resumo.map(({ label, value }) => (
+          <div key={label}><span>{label}</span><strong>{value}</strong></div>
+        ))}
       </div>
 
       {secoes.map((secao, index) => (
@@ -191,8 +130,7 @@ export function ContractPreview({ contract, profile, innerRef }: ContractPreview
       </section>
 
       <p className="preview__footnote">
-        Documento gerado automaticamente pela plataforma ContratoFree em{' '}
-        {new Date().toLocaleDateString('pt-BR')}.
+        ContratoFree · {contract.id || 'Prévia'}
       </p>
     </div>
   )

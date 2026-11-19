@@ -31,6 +31,16 @@ export function contratoCanonico(contrato: Contract): string {
       rescisao: Boolean(contrato.clausulas?.rescisao),
     },
     criadoEm: contrato.criadoEm,
+    ...(contrato.pagamento && { pagamento: contrato.pagamento }),
+    ...(contrato.entregaveis && { entregaveis: contrato.entregaveis }),
+    ...(contrato.prestador && {
+      prestador: [
+        contrato.prestador.nome, contrato.prestador.email, contrato.prestador.telefone,
+        contrato.prestador.profissao, contrato.prestador.pix, contrato.prestador.termosPadrao,
+        contrato.prestador.marca, contrato.prestador.documento, contrato.prestador.endereco,
+        contrato.prestador.imagem, contrato.prestador.temaPdf,
+      ],
+    }),
   })
 }
 

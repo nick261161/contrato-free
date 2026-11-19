@@ -1,176 +1,106 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Carousel } from '../components/Carousel'
 import { Footer } from '../components/Footer'
 import { Header } from '../components/Header'
-import { Tilt } from '../components/Tilt'
+import { useAuth } from '../context/AuthContext'
 
 const features = [
-  {
-    icon: '⚡',
-    title: 'Geração em segundos',
-    text: 'Preencha um wizard curto e receba o contrato completo com cláusulas e valores já preenchidos.',
-  },
-  {
-    icon: '🧩',
-    title: 'Termos padrão reutilizáveis',
-    text: 'Cadastre uma vez as suas condições de pagamento e prazos: elas entram automaticamente em todo contrato.',
-  },
-  {
-    icon: '📊',
-    title: 'Painel de métricas',
-    text: 'Acompanhe valor faturado, contratos pendentes e prazos de entrega em um só lugar.',
-  },
-  {
-    icon: '🖨️',
-    title: 'Exportação em PDF',
-    text: 'Imprima ou salve o contrato finalizado direto do navegador, pronto para assinar.',
-  },
-]
-
-const steps = [
-  { n: '1', title: 'Cadastre seus dados', text: 'Nome, contato, PIX e termos padrão no perfil.' },
-  { n: '2', title: 'Preencha o wizard', text: 'Cliente, escopo, valor e prazo do serviço.' },
-  { n: '3', title: 'Gere e compartilhe', text: 'Confira a prévia e exporte o documento.' },
+  { icon: '▤', title: 'Modelos por serviço', text: 'Comece com um escopo pronto para design, sites, redes sociais, vídeo ou redação.' },
+  { icon: '◈', title: 'Sua identidade no PDF', text: 'Adicione seu logo ou foto e escolha o estilo visual do documento.' },
+  { icon: '⊞', title: 'Dados sempre à mão', text: 'Reaproveite contatos, prazos, valores e condições de pagamento nos próximos trabalhos.' },
+  { icon: '✓', title: 'Assinatura por link', text: 'Compartilhe o contrato com seu cliente e acompanhe as assinaturas pelo painel.' },
 ]
 
 export function Home() {
-  const [highlight, setHighlight] = useState(0)
   const { hash } = useLocation()
+  const { user } = useAuth()
 
-  // useEffect: alterna o destaque do hero para criar um pequeno carrossel
   useEffect(() => {
-    const timer = setInterval(() => {
-      setHighlight((current) => (current + 1) % steps.length)
-    }, 2500)
-    return () => clearInterval(timer)
-  }, [])
-
-  // Links do rodapé chegam como /#seccion — rola suave até o alvo.
-  useEffect(() => {
-    if (!hash) return
-    const alvo = document.getElementById(hash.slice(1))
-    alvo?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
   }, [hash])
 
-  return (
-    <div className="page">
-      <Header />
+  const destination = user ? '/novo-contrato' : '/login?modo=cadastro'
+  const action = user ? 'Criar contrato' : 'Criar conta grátis'
 
+  return (
+    <div className="page landing">
+      <Header />
       <main>
-        <section className="hero">
-          <div className="container hero__inner">
-            <div className="hero__content">
-              <span className="hero__tag">Feito para freelancers</span>
-              <h1>
-                Contratos fechados em minutos,
-                <span className="hero__accent"> sem burocracia.</span>
-              </h1>
-              <p>
-                O ContratoFree automatiza a criação dos seus contratos de prestação
-                de serviços: dados do cliente, escopo, valores e cláusulas padrão em
-                um único fluxo guiado.
-              </p>
-              <div className="hero__cta">
-                <Link to="/novo-contrato" className="btn btn--primary btn--lg">
-                  Gerar meu primeiro contrato
-                </Link>
-                <Link to="/login" className="btn btn--secondary btn--lg">
-                  Já tenho conta
-                </Link>
-              </div>
-              <div className="hero__stats">
-                <div>
-                  <strong>+2.400</strong>
-                  <span>contratos gerados</span>
-                </div>
-                <div>
-                  <strong>4 min</strong>
-                  <span>tempo médio por contrato</span>
-                </div>
-                <div>
-                  <strong>100%</strong>
-                  <span>personalizável</span>
-                </div>
+        <section className="landing-hero">
+          <div className="container landing-hero__layout">
+            <div className="landing-hero__copy">
+              <p className="landing-eyebrow">Contratos para freelancers</p>
+              <h1>Feche projetos <em>com confiança.</em></h1>
+              <p>Crie contratos com a sua marca, reutilize os dados de cada trabalho e envie para seu cliente assinar por link.</p>
+              <div className="landing-hero__actions">
+                <Link to={destination} className="btn btn--primary btn--lg">{action}</Link>
+                <Link to="/#como-funciona" className="btn btn--ghost btn--lg">Como funciona</Link>
               </div>
             </div>
 
-            <Tilt className="hero__card" aria-hidden={true}>
-              <div className="hero__card-head">
-                <span className="badge badge--pendente">Prévia</span>
-                <span>Contrato #1004</span>
+            <div className="landing-showcase" aria-label="Exemplo de um contrato personalizado">
+              <div className="landing-showcase__sheet">
+                <div className="landing-paper__brand">
+                  <span className="landing-paper__logo" aria-hidden="true">m.</span>
+                  <div><span>Estúdio Mirante</span><small>Design independente</small></div>
+                </div>
+                <div className="landing-paper__title">
+                  <small>Contrato de prestação de serviços</small>
+                  <strong>Identidade<br />visual</strong>
+                </div>
+                <div className="landing-paper__details">
+                  <div><span>Investimento</span><strong>R$ 3.500,00</strong></div>
+                  <div><span>Prazo</span><strong>30 dias</strong></div>
+                </div>
+                <div className="landing-paper__lines" aria-hidden="true"><i /><i /><i /></div>
+                <div className="landing-paper__signature"><span>Marina Lima</span><small>Prestadora</small></div>
               </div>
-              <h3>Landing page institucional</h3>
-              <p>Cliente: Padaria Estrela</p>
-              <div className="hero__card-row">
-                <span>Valor</span>
-                <strong>R$ 3.500,00</strong>
+              <div className="landing-showcase__status">
+                <span aria-hidden="true">✓</span>
+                <div><strong>Assinatura registrada</strong><small>Estúdio Mirante · Prestador</small></div>
               </div>
-              <div className="hero__card-row">
-                <span>Prazo</span>
-                <strong>30 dias</strong>
-              </div>
-              <div className="hero__card-bar">
-                <span style={{ width: `${((highlight + 1) / steps.length) * 100}%` }} />
-              </div>
-              <small>Etapa {highlight + 1} de {steps.length}: {steps[highlight].title}</small>
-            </Tilt>
+            </div>
           </div>
         </section>
 
-        <section className="section" id="funcionalidades">
+        <section className="landing-features" id="funcionalidades">
           <div className="container">
-            <header className="section__head">
-              <span>Funcionalidades</span>
-              <h2>Tudo o que você precisa para contratar certo</h2>
-            </header>
-
-            <Carousel label="Funcionalidades" className="carousel--features">
+            <div className="landing-section-heading">
+              <h2>Seu processo de contrato, em um só lugar</h2>
+              <p>Do escopo inicial ao PDF assinado, com os dados que você já usa no dia a dia.</p>
+            </div>
+            <div className="landing-features__grid">
               {features.map((feature) => (
-                <Tilt key={feature.title} as="article" className="feature">
-                  <span className="feature__icon">{feature.icon}</span>
+                <article className="landing-feature" key={feature.title}>
+                  <span className="landing-feature__icon" aria-hidden="true">{feature.icon}</span>
                   <h3>{feature.title}</h3>
                   <p>{feature.text}</p>
-                </Tilt>
-              ))}
-            </Carousel>
-          </div>
-        </section>
-
-        <section className="section section--muted" id="como-funciona">
-          <div className="container">
-            <header className="section__head">
-              <span>Como funciona</span>
-              <h2>Três etapas até o contrato assinado</h2>
-            </header>
-
-            <div className="steps">
-              {steps.map((step, index) => (
-                <Tilt
-                  key={step.n}
-                  as="article"
-                  className={`step ${index === highlight ? 'step--active' : ''}`}
-                >
-                  <span className="step__number">{step.n}</span>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
-                </Tilt>
+                </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="cta" id="precos">
-          <div className="container cta__inner">
-            <h2>Pronto para automatizar seus contratos?</h2>
-            <p>Crie sua conta gratuita e gere o primeiro contrato em menos de 5 minutos.</p>
-            <Link to="/login" className="btn btn--light btn--lg">
-              Começar agora
-            </Link>
+        <section className="landing-flow" id="como-funciona">
+          <div className="container landing-flow__grid">
+            <div className="landing-section-heading">
+              <h2>Do primeiro rascunho à assinatura</h2>
+            </div>
+            <ol>
+              <li><div><strong>Personalize seu perfil</strong><p>Salve sua marca, os dados do prestador e as condições que você usa com frequência.</p></div></li>
+              <li><div><strong>Monte o contrato</strong><p>Escolha um modelo, adicione o cliente e ajuste o escopo, os entregáveis e o pagamento.</p></div></li>
+              <li><div><strong>Revise e compartilhe</strong><p>Baixe o PDF personalizado ou envie o link de assinatura ao cliente.</p></div></li>
+            </ol>
+          </div>
+        </section>
+
+        <section className="landing-end" id="precos">
+          <div className="container landing-end__inner">
+            <h2>Seu próximo projeto começa aqui.</h2>
+            <Link to={destination} className="btn btn--primary btn--lg">{action}</Link>
           </div>
         </section>
       </main>
-
       <Footer />
     </div>
   )

@@ -84,6 +84,9 @@ export async function ensureSchema() {
     -- Nicho + cláusulas opcionais do wizard (aditivo, idempotente)
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS nicho TEXT NOT NULL DEFAULT '';
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS clausulas JSONB NOT NULL DEFAULT '{}';
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS pagamento TEXT NOT NULL DEFAULT '';
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS entregaveis TEXT NOT NULL DEFAULT '';
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS prestador_snapshot JSONB;
 
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
@@ -110,6 +113,7 @@ export async function ensureSchema() {
       pix TEXT NOT NULL DEFAULT '',
       termos_padrao TEXT NOT NULL DEFAULT ''
     );
+    ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferencias JSONB NOT NULL DEFAULT '{}';
   `)
 }
 
@@ -132,6 +136,9 @@ export function mapContract(row) {
     assinaturaContratante: row.assinatura_contratante ?? undefined,
     nicho: row.nicho ?? '',
     clausulas: row.clausulas ?? {},
+    pagamento: row.pagamento ?? '',
+    entregaveis: row.entregaveis ?? '',
+    prestador: row.prestador_snapshot ?? undefined,
   }
 }
 
@@ -154,7 +161,15 @@ export function mapProfile(row) {
     profissao: row.profissao,
     pix: row.pix,
     termosPadrao: row.termos_padrao,
+    ...row.preferencias,
   }
+}
+
+export function profileSnapshot(row) {
+  if (!row) return undefined
+  const profile = mapProfile(row)
+  delete profile.padroes
+  return profile
 }
 
 // ---------------------------------------------------------------------------
