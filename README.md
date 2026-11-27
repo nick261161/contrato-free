@@ -1,5 +1,10 @@
 # 📄 ContratoFree — Automação de Contratos para Freelancers
-
+Nicolas Kalyson Correia de Sousa / 01800410
+Guilherme Ferreira da Silva/01796258 
+Antonio Leandro de Moraes Mendes/ 01815675
+Vinicius Gabriel Correia de Sousa /01800559
+João wicenth Melo Araújo/
+01802804
 > Plataforma web desenvolvida em **React.js + TypeScript (Vite)** com **API REST
 > (Express + PostgreSQL)** e serviços gerenciados no **Neon**: banco **PostgreSQL**
 > (branch `production`) e login com **Neon Auth** (Managed Better Auth).
